@@ -1,0 +1,168 @@
+/* ============================================================
+   STOCKIST — shared design system
+   Hex-inspired: warm paper, quirky display type, mono labels,
+   deep indigo data accents. Two themes share this DNA.
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,600;12..96,700;12..96,800&family=Hanken+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* type */
+  --font-display: 'Bricolage Grotesque', sans-serif;
+  --font-ui: 'Hanken Grotesk', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* warm paper surfaces */
+  --paper: oklch(0.985 0.006 85);
+  --paper-2: oklch(0.965 0.008 85);
+  --paper-3: oklch(0.945 0.009 85);
+  --card: oklch(0.998 0.003 85);
+  --ink: oklch(0.235 0.012 60);
+  --ink-2: oklch(0.42 0.012 60);
+  --ink-3: oklch(0.58 0.010 65);
+  --line: oklch(0.905 0.006 80);
+  --line-2: oklch(0.86 0.007 80);
+
+  /* accent (tweakable) — soft/ink derive from --accent */
+  --accent: oklch(0.42 0.15 280);
+  --accent-2: var(--accent);
+  --accent-soft: color-mix(in oklch, var(--accent) 14%, var(--paper));
+  --accent-ink: color-mix(in oklch, var(--accent) 80%, black);
+
+  /* data-viz ramp (Hex-like) */
+  --viz-1: oklch(0.45 0.16 280);
+  --viz-2: oklch(0.62 0.13 165);
+  --viz-3: oklch(0.78 0.14 85);
+  --viz-4: oklch(0.66 0.16 45);
+  --viz-5: oklch(0.55 0.13 320);
+
+  --ok: oklch(0.58 0.13 160);
+  --warn: oklch(0.70 0.15 70);
+  --danger: oklch(0.55 0.18 25);
+
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 16px;
+  --shadow-sm: 0 1px 2px oklch(0.4 0.02 70 / 0.06), 0 1px 1px oklch(0.4 0.02 70 / 0.04);
+  --shadow-md: 0 8px 24px -10px oklch(0.35 0.02 70 / 0.18), 0 2px 6px -2px oklch(0.35 0.02 70 / 0.08);
+  --shadow-lg: 0 24px 60px -20px oklch(0.3 0.02 70 / 0.28), 0 8px 20px -8px oklch(0.3 0.02 70 / 0.12);
+
+  --density: 1;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font-ui);
+  color: var(--ink);
+  background: var(--paper);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+button { font-family: inherit; cursor: pointer; }
+::selection { background: var(--accent-soft); }
+
+/* paper grain — subtle, fixed */
+.grain::before {
+  content: '';
+  position: fixed; inset: 0;
+  pointer-events: none; z-index: 9999;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* mono label — the dashed/bordered pill motif */
+.mono-label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.mono-tag {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink-2);
+  border: 1px dashed var(--line-2);
+  border-radius: var(--r-sm);
+  padding: 4px 9px;
+  background: var(--card);
+  display: inline-flex; align-items: center; gap: 6px;
+  white-space: nowrap;
+}
+
+/* scrollbars */
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 10px; border: 3px solid transparent; background-clip: padding-box; }
+*::-webkit-scrollbar-thumb:hover { background: var(--ink-3); background-clip: padding-box; }
+
+/* product image placeholder — refined tonal block */
+.ph {
+  position: relative; overflow: hidden;
+  background:
+    repeating-linear-gradient(135deg, oklch(1 0 0 / 0.5) 0 1px, transparent 1px 9px),
+    var(--ph-tint, var(--paper-3));
+  display: flex; align-items: flex-end; justify-content: flex-start;
+}
+.ph .ph-cap {
+  font-family: var(--font-mono);
+  font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase;
+  color: oklch(0.35 0.02 70 / 0.55);
+  padding: 10px 12px;
+}
+.ph .ph-mark {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-weight: 700;
+  color: oklch(0.35 0.02 70 / 0.18);
+  letter-spacing: -0.02em;
+}
+
+/* ============ App shell / role switcher ============ */
+#app { min-height: 100vh; }
+
+.role-switch {
+  position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
+  z-index: 800;
+  display: flex; align-items: center; gap: 0;
+  background: oklch(0.18 0.012 60 / 0.92);
+  backdrop-filter: blur(14px) saturate(1.2);
+  border-radius: 999px;
+  padding: 5px;
+  box-shadow: var(--shadow-lg);
+  border: 1px solid oklch(1 0 0 / 0.08);
+  transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.2,0.7,0.2,1);
+}
+body.modal-open .role-switch { opacity: 0; pointer-events: none; transform: translateX(-50%) translateY(26px); }
+.role-switch .rs-label {
+  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.14em;
+  text-transform: uppercase; color: oklch(0.85 0.01 80 / 0.55);
+  padding: 0 12px 0 14px;
+}
+.role-switch button {
+  border: none; background: transparent;
+  color: oklch(0.92 0.01 80 / 0.7);
+  font-family: var(--font-ui); font-weight: 600; font-size: 13px;
+  padding: 8px 18px; border-radius: 999px;
+  display: flex; align-items: center; gap: 8px;
+  transition: all 0.22s cubic-bezier(0.2,0.7,0.3,1);
+}
+.role-switch button .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.5; }
+.role-switch button.active {
+  background: var(--paper);
+  color: var(--ink);
+  box-shadow: var(--shadow-sm);
+}
+.role-switch button.active .dot { background: var(--accent); opacity: 1; }
+
+/* fade transition between roles */
+.role-stage { animation: roleIn 0.5s cubic-bezier(0.2,0.7,0.2,1); }
+@keyframes roleIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.btn-reset {
+  appearance: none; border: 1px solid var(--line-2); background: var(--card);
+  color: var(--ink-2); font-family: var(--font-mono); font-size: 10px;
+  letter-spacing: 0.06em; text-transform: uppercase; border-radius: 999px;
+  padding: 7px 12px; transition: all 0.18s;
+}
+.btn-reset:hover { color: var(--ink); border-color: var(--ink-3); }
