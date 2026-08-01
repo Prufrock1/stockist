@@ -10,6 +10,11 @@ import './brand.css';
    BRAND — insights, retailers, order drawer, app shell
    ============================================================ */
 
+// The signed-in brand. A brand only ever edits its own booth, so this is the
+// single point that decides whose booth the Showroom editor loads.
+// PRODUCTION: comes from the authenticated session, not a constant.
+const SESSION_BRAND_ID = 'b1';   // Maison Verre
+
 const RETAILERS = [
   { name: 'Maison Bleu',     loc: 'Paris, FR',     orders: 24, spend: 38400, since: '2023' },
   { name: 'The Larder',      loc: 'London, UK',    orders: 18, spend: 29100, since: '2022' },
@@ -218,7 +223,7 @@ export function BrandApp() {
         {nav === 'products' && <ProductsView />}
         {nav === 'insights' && <InsightsView />}
         {nav === 'retailers' && <RetailersView />}
-        {nav === 'showroom' && <Showroom mode="edit" />}
+        {nav === 'showroom' && <Showroom mode="edit" initialBrandId={SESSION_BRAND_ID} />}
       </main>
 
       {drawer && <OrderDrawer id={drawer} onClose={() => setDrawer(null)} />}

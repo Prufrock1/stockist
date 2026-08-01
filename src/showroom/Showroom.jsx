@@ -328,10 +328,9 @@ export function Showroom({ mode = 'visit', initialBrandId = null, onExit = null,
   const s = useStore();
   const brands = BRANDS;
   const idxOf = (id) => Math.max(0, brands.findIndex(b => b.id === id));
-  const [bi, setBi] = React.useState(() => {
-    if (initialBrandId) return idxOf(initialBrandId);
-    return parseInt(localStorage.getItem('stockist:srBrand') || '0') || 0;
-  });
+  // In edit mode this is fixed to the signed-in brand's own booth and never
+  // changes — a brand has no business browsing anyone else's booth.
+  const [bi, setBi] = React.useState(() => (initialBrandId ? idxOf(initialBrandId) : 0));
   const [depth, setDepth] = React.useState(0);
   const [popup, setPopup] = React.useState(null);
   const [msg, setMsg] = React.useState(false);
@@ -351,7 +350,6 @@ export function Showroom({ mode = 'visit', initialBrandId = null, onExit = null,
 
   // jump to a brand when entering from the trade floor
   React.useEffect(() => { if (initialBrandId) setBi(idxOf(initialBrandId)); }, [initialBrandId]);
-  React.useEffect(() => { if (mode === 'edit') localStorage.setItem('stockist:srBrand', String(bi)); }, [bi, mode]);
 
   // cinematic intro push-in on first mount
   React.useEffect(() => { const t = setTimeout(() => setTarget(0.12), 450); return () => clearTimeout(t); }, []);
@@ -400,7 +398,6 @@ export function Showroom({ mode = 'visit', initialBrandId = null, onExit = null,
   };
   const railDrag = React.useRef(false);
 
-  const switchBrand = (n) => { setBi(n); setTarget(0); setPopup(null); setMsg(false); };
   const flash = (txt) => { setToast(txt); clearTimeout(window.__srT); window.__srT = setTimeout(() => setToast(null), 2200); };
   const added = (p) => flash(`${p.name} added to order`);
 
@@ -424,21 +421,18 @@ export function Showroom({ mode = 'visit', initialBrandId = null, onExit = null,
       <div className="sr-ui">
         {/* top-left: identity + back/walk controls */}
         <div className="sr-top">
-          {mode === 'visit' && onExit
-            ? <button className="st-arrow st-back" onClick={onExit} title={exitLabel}><Ico name="arrowL" size={16} /><span>{exitLabel}</span></button>
-            : <button className="st-arrow" onClick={() => switchBrand((bi - 1 + brands.length) % brands.length)}><Ico name="arrowL" size={16} /></button>}
+          {mode === 'visit' && onExit && (
+            <button className="st-arrow st-back" onClick={onExit} title={exitLabel}><Ico name="arrowL" size={16} /><span>{exitLabel}</span></button>
+          )}
           <div className="st-mid">
+            {/* Edit mode is your own booth, so there is no position-in-a-set to
+                report — the booth number only means something while browsing. */}
             <div className="st-mono">{mode === 'edit'
-              ? `Editing · booth ${String(bi + 1).padStart(2, '0')}/${String(brands.length).padStart(2, '0')}`
+              ? 'Editing · your booth'
               : `Showroom · booth ${String(bi + 1).padStart(2, '0')}/${String(brands.length).padStart(2, '0')}`}</div>
             <div className="st-name">{brand.name}</div>
             <div className="st-sub">{cfg.kicker} · {brand.loc}</div>
           </div>
-          {/* brand paging is an edit-mode affordance — a visited booth is a
-              destination you back out of, not a carousel */}
-          {mode === 'edit' && (
-            <button className="st-arrow" onClick={() => switchBrand((bi + 1) % brands.length)}><Ico name="arrowR" size={16} /></button>
-          )}
         </div>
 
         {/* visit-only: favorite the booth */}
@@ -446,12 +440,6 @@ export function Showroom({ mode = 'visit', initialBrandId = null, onExit = null,
           <button className={'sr-fav' + (faved ? ' on' : '')} onClick={() => { actions.toggleFav(brand.id); flash(faved ? 'Removed from saved booths' : 'Booth saved'); }}>
             <Ico name="heart" size={15} /> {faved ? 'Saved' : 'Save booth'}
           </button>
-        )}
-
-        {mode === 'edit' && (
-          <div className="sr-dots">
-            {brands.map((b, i) => <div key={b.id} className={'srd ' + (i === bi ? 'on' : '')} title={b.name} onClick={() => switchBrand(i)} />)}
-          </div>
         )}
 
         <div className="sr-rail">
