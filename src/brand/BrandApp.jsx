@@ -3,17 +3,11 @@ import { CATEGORIES, brandById, money, useStore, actions, STATUS_FLOW, orderLine
 import { Ico, Ph } from '../components/ui.jsx';
 import { HBars, StackedChart, WEEK, CAT_COLORS } from './charts.jsx';
 import { Overview, OrdersView, ProductsView, NAV, HEADERS, timeAgo } from './brand-views.jsx';
-import { Showroom } from '../showroom/Showroom.jsx';
 import './brand.css';
 
 /* ============================================================
    BRAND — insights, retailers, order drawer, app shell
    ============================================================ */
-
-// The signed-in brand. A brand only ever edits its own booth, so this is the
-// single point that decides whose booth the Showroom editor loads.
-// PRODUCTION: comes from the authenticated session, not a constant.
-const SESSION_BRAND_ID = 'b1';   // Maison Verre
 
 const RETAILERS = [
   { name: 'Maison Bleu',     loc: 'Paris, FR',     orders: 24, spend: 38400, since: '2023' },
@@ -166,7 +160,10 @@ function OrderDrawer({ id, onClose }) {
 // ---------- Brand app shell ----------
 export function BrandApp() {
   const s = useStore();
-  const [nav, setNav] = React.useState(() => localStorage.getItem('stockist:bdNav') || 'overview');
+  const [nav, setNav] = React.useState(() => {
+    const saved = localStorage.getItem('stockist:bdNav');
+    return saved && HEADERS[saved] ? saved : 'overview';
+  });
   const [drawer, setDrawer] = React.useState(null);
   React.useEffect(() => { localStorage.setItem('stockist:bdNav', nav); }, [nav]);
   const newCount = s.orders.filter(o => o.status === 'new').length;
@@ -223,7 +220,6 @@ export function BrandApp() {
         {nav === 'products' && <ProductsView />}
         {nav === 'insights' && <InsightsView />}
         {nav === 'retailers' && <RetailersView />}
-        {nav === 'showroom' && <Showroom mode="edit" initialBrandId={SESSION_BRAND_ID} />}
       </main>
 
       {drawer && <OrderDrawer id={drawer} onClose={() => setDrawer(null)} />}

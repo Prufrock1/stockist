@@ -8,16 +8,11 @@ import { Ico, Ph } from '../components/ui.jsx';
 import { ProdImg } from '../components/ProductImage.jsx';
 import { productImages } from '../data/images.js';
 import { ProductDetail, CartDrawer, Confirm, RetailerOrders } from './retailer-flow.jsx';
-import { TradeFloor } from '../tradefloor/TradeFloor.jsx';
-import { FloorSwitch } from '../tradefloor/FloorSwitch.jsx';
-import { Showroom } from '../showroom/Showroom.jsx';
 import './retailer.css';
 
-// Secondary destinations, lazily loaded so their weight stays off the first
-// paint — FpsApp in particular pulls in three.js (~540 kB).
-const FpsApp = React.lazy(() => import('../tradefloor/FpsApp.jsx').then(m => ({ default: m.FpsApp })));
+// The Console is a full-viewport destination, lazily loaded so its weight
+// stays off the first paint.
 const ConsoleApp = React.lazy(() => import('../console/ConsoleApp.jsx').then(m => ({ default: m.ConsoleApp })));
-const PavilionApp = React.lazy(() => import('../pavilion/PavilionApp.jsx').then(m => ({ default: m.PavilionApp })));
 
 const Loading = ({ label }) => (
   <div style={{ position: 'fixed', inset: 0, display: 'grid', placeItems: 'center',
@@ -32,7 +27,7 @@ const SORTS = [
   { key: 'margin', label: 'Best margin' },
 ];
 
-function ProductCard({ p, layout, onOpen, onQuickAdd, onVisitBooth }) {
+function ProductCard({ p, layout, onOpen, onQuickAdd }) {
   const brand = brandById(p.b);
   const low = p.stock < 20;
   if (layout === 'index') {
@@ -45,7 +40,7 @@ function ProductCard({ p, layout, onOpen, onQuickAdd, onVisitBooth }) {
           ))}
         </div>
         <div className="fc-body">
-          <div className="fc-brand" onClick={e => { e.stopPropagation(); onVisitBooth && onVisitBooth(); }}>{brand.name}</div>
+          <div className="fc-brand">{brand.name}</div>
           <h3 className="fc-name">{p.name}</h3>
           <div className="fc-price">{money(p.wp)} <span>/ {p.unit}</span></div>
           <div className="fc-sub">{mg}% margin · MOQ {p.moq}{low && <span className="fc-low"> · Low stock</span>}</div>
@@ -70,15 +65,11 @@ function ProductCard({ p, layout, onOpen, onQuickAdd, onVisitBooth }) {
   );
 }
 
-export function RetailerApp({ layout, floorStyle }) {
+export function RetailerApp({ layout }) {
   const s = useStore();
   const [view, setView] = React.useState('catalog');
   const [activeId, setActiveId] = React.useState(null);
-  const [activeBrand, setActiveBrand] = React.useState(null);
   const [cat, setCat] = React.useState('All');
-  // one directory, four viewpoints: map · aisles · first person · wander
-  const [floorMode, setFloorMode] = React.useState(() => (floorStyle === 'isometric' ? 'map' : 'aisles'));
-  React.useEffect(() => { if (floorStyle) setFloorMode(floorStyle === 'isometric' ? 'map' : 'aisles'); }, [floorStyle]);
   const [sortI, setSortI] = React.useState(0);
   const [cartOpen, setCartOpen] = React.useState(false);
   const [lastOrder, setLastOrder] = React.useState(null);
@@ -90,8 +81,7 @@ export function RetailerApp({ layout, floorStyle }) {
 
   const open = (id) => { setActiveId(id); setView('product'); window.scrollTo(0, 0); };
   const goCatalog = () => { setView('catalog'); window.scrollTo(0, 0); };
-  const goFloor = (m) => { if (m) setFloorMode(m); setView('floor'); window.scrollTo(0, 0); };
-  const enterBooth = (brandId) => { setActiveBrand(brandId); setView('showroom'); window.scrollTo(0, 0); };
+  const goConsole = () => { setView('console'); window.scrollTo(0, 0); };
   const quickAdd = (p) => { actions.addToCart(p.id, p.moq); flash(`${p.name} added · ${p.moq} × ${p.unit}`); };
 
   let list = PRODUCTS.filter(p => cat === 'All' || p.cat === cat);
@@ -104,28 +94,11 @@ export function RetailerApp({ layout, floorStyle }) {
     <span className={'rt-navlink ' + (view === id ? 'active' : '')} onClick={() => { setView(id); window.scrollTo(0, 0); }}>{children}</span>
   );
 
-  // Full-viewport takeover modes. Both ship their own shell (FPS is a fixed
-  // WebGL canvas, the Console has its own sidebar), so they replace the
-  // retailer chrome entirely and offer their own way back.
-  const floorSwitch = (offset) => (
-    <FloorSwitch mode={floorMode} onChange={setFloorMode} offset={offset} />
-  );
-
+  // The Console ships its own shell (sidebar + chat), so it replaces the
+  // retailer chrome entirely and offers its own way back.
   if (view === 'console') return (
     <React.Suspense fallback={<Loading label="Opening the console…" />}>
       <ConsoleApp onExit={goCatalog} />
-    </React.Suspense>
-  );
-  // First person and Wander bring their own full-viewport shell, so they
-  // replace the retailer chrome and carry the switcher in their own HUD.
-  if (view === 'floor' && floorMode === 'fps') return (
-    <React.Suspense fallback={<Loading label="Building the hall…" />}>
-      <FpsApp onExit={goCatalog} toolbar={floorSwitch('bare')} />
-    </React.Suspense>
-  );
-  if (view === 'floor' && floorMode === 'wander') return (
-    <React.Suspense fallback={<Loading label="Laying out the pavilion…" />}>
-      <PavilionApp onExit={goCatalog} toolbar={floorSwitch('bare')} />
     </React.Suspense>
   );
 
@@ -136,8 +109,7 @@ export function RetailerApp({ layout, floorStyle }) {
         <div className="rt-navin">
           <div className="rt-navleft">
             <span className={'rt-navlink ' + (view === 'catalog' || view === 'product' ? 'active' : '')} onClick={goCatalog}>Shop</span>
-            <span className={'rt-navlink ' + (view === 'floor' || view === 'showroom' ? 'active' : '')} onClick={() => goFloor()}>Trade floor</span>
-            <span className={'rt-navlink ' + (view === 'console' ? 'active' : '')} onClick={() => { setView('console'); window.scrollTo(0, 0); }}>Console</span>
+            <span className={'rt-navlink ' + (view === 'console' ? 'active' : '')} onClick={goConsole}>Console</span>
           </div>
           <div className="rt-logo" onClick={goCatalog}>STOCKIST</div>
           <div className="rt-navright">
@@ -159,7 +131,7 @@ export function RetailerApp({ layout, floorStyle }) {
             <div className="rt-hero-lead">
               <p>Buy directly from the makers you want on your shelves — small-batch food, considered apparel, hand-made homeware. One trade account, one order, net-30 terms.</p>
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                <button className="btn-fill" onClick={() => goFloor('aisles')}><Ico name="store" size={15} /> Walk the aisles</button>
+                <button className="btn-fill" onClick={goConsole}><Ico name="store" size={15} /> Open the console</button>
                 <button className="btn-line" onClick={() => document.querySelector('.rt-catalog').scrollIntoView({ behavior: 'smooth' })}>Browse the catalogue <Ico name="arrowR" size={14} /></button>
               </div>
             </div>
@@ -182,7 +154,7 @@ export function RetailerApp({ layout, floorStyle }) {
             </div>
             <div className={'rt-grid ' + layout}>
               {list.map(p => (
-                <ProductCard key={p.id} p={p} layout={layout} onOpen={() => open(p.id)} onQuickAdd={() => quickAdd(p)} onVisitBooth={() => enterBooth(p.b)} />
+                <ProductCard key={p.id} p={p} layout={layout} onOpen={() => open(p.id)} onQuickAdd={() => quickAdd(p)} />
               ))}
             </div>
           </div>
@@ -196,30 +168,15 @@ export function RetailerApp({ layout, floorStyle }) {
 
       {view === 'orders' && <RetailerOrders goCatalog={goCatalog} />}
 
-      {view === 'floor' && (
-        <TradeFloor layout={floorMode === 'map' ? 'isometric' : 'concourse'}
-          onEnter={enterBooth} toolbar={floorSwitch('nav')} />
-      )}
-
-      {view === 'showroom' && (
-        <div className="rt-showroom">
-          {/* wrap: onExit fires with a click event, which would otherwise be
-              passed through as a floor mode */}
-          <Showroom mode="visit" initialBrandId={activeBrand} onExit={() => goFloor()} />
-        </div>
-      )}
-
       {view === 'confirm' && <Confirm orderId={lastOrder} goCatalog={goCatalog} goOrders={() => { setView('orders'); window.scrollTo(0, 0); }} />}
 
       {/* footer */}
-      {view !== 'showroom' && view !== 'floor' && (
-        <div className="rt-ftr">
-          <div className="rt-ftrin">
-            <div className="f-logo">STOCKIST</div>
-            <div className="f-mono">WHOLESALE MARKETPLACE · BRANDS ↔ RETAILERS · NET-30</div>
-          </div>
+      <div className="rt-ftr">
+        <div className="rt-ftrin">
+          <div className="f-logo">STOCKIST</div>
+          <div className="f-mono">WHOLESALE MARKETPLACE · BRANDS ↔ RETAILERS · NET-30</div>
         </div>
-      )}
+      </div>
 
       {cartOpen && (
         <CartDrawer onClose={() => setCartOpen(false)} goCatalog={goCatalog}

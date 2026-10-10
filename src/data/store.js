@@ -3,7 +3,7 @@
    One source of truth. Retailer orders flow into Brand queue.
 
    Backend note: this store currently owns ALL state (catalogue,
-   orders, booths) and persists to localStorage. When the backend
+   orders) and persists to localStorage. When the backend
    lands, route the actions below through src/data/api.js and keep
    only session state (cart, favourites, current view) here.
    ============================================================ */
@@ -17,41 +17,6 @@ export const productById = (id) => PRODUCTS.find(p => p.id === id);
 export const brandById   = (id) => BRANDS.find(b => b.id === id);
 export const money = (n) => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: (n % 1 ? 2 : 0), maximumFractionDigits: 2 });
 
-// ============ booth (showroom) configuration ============
-// Each brand has a customizable booth. Brands edit it; retailers visit it.
-export const BOOTH_ACCENTS = [
-  'oklch(0.42 0.15 280)', // indigo
-  'oklch(0.40 0.13 25)',  // oxblood
-  'oklch(0.42 0.10 155)', // forest
-  'oklch(0.46 0.10 235)', // steel
-  'oklch(0.45 0.12 330)', // plum
-  'oklch(0.32 0.025 270)',// ink
-];
-export const FLOOR_FINISHES = ['oak', 'concrete', 'travertine', 'charcoal'];
-export const WALL_FINISHES  = ['plaster', 'sand', 'sage', 'ink'];
-export const BOOTH_LAYOUTS  = ['gallery', 'market'];
-export const FINISH_LABELS = {
-  oak: 'Oak', concrete: 'Concrete', travertine: 'Travertine', charcoal: 'Charcoal',
-  plaster: 'Plaster', sand: 'Sand', sage: 'Sage', ink: 'Ink',
-  gallery: 'Gallery', market: 'Market stall',
-};
-
-export function defaultBooth(brandId) {
-  const b = brandById(brandId);
-  const idx = BRANDS.findIndex(x => x.id === brandId);
-  const sk = PRODUCTS.filter(p => p.b === brandId);
-  return {
-    accent: BOOTH_ACCENTS[idx % BOOTH_ACCENTS.length],
-    kicker: b.category,
-    tagline: b.tagline,
-    heroId: sk[0] ? sk[0].id : null,
-    plinthIds: sk.slice(0, 3).map(p => p.id),
-    floor: FLOOR_FINISHES[idx % FLOOR_FINISHES.length],
-    wall: 'plaster',
-    layout: 'gallery',
-  };
-}
-
 // ============ store ============
 const STORE_KEY = 'stockist:v4';
 export const STATUS_FLOW = ['new', 'packing', 'shipped'];
@@ -61,7 +26,7 @@ function loadState() {
     const raw = localStorage.getItem(STORE_KEY);
     if (raw) return JSON.parse(raw);
   } catch (e) {}
-  return { cart: {}, orders: seedOrders(), retailer: 'Maison Bleu', booths: {}, favorites: [] };
+  return { cart: {}, orders: seedOrders(), retailer: 'Maison Bleu', favorites: [] };
 }
 
 let state = loadState();
@@ -74,12 +39,6 @@ export const store = {
   getState: () => state,
   subscribe: (l) => { listeners.add(l); return () => listeners.delete(l); },
 };
-
-// merge a brand's saved booth edits over computed defaults
-export function getBooth(brandId) {
-  const saved = (state.booths && state.booths[brandId]) || {};
-  return { ...defaultBooth(brandId), ...saved };
-}
 
 // ---- actions ----
 export const actions = {
@@ -116,12 +75,6 @@ export const actions = {
   setOrderStatus(id, status) {
     setState(s => ({ orders: s.orders.map(o => o.id === id ? { ...o, status } : o) }));
   },
-  updateBooth(brandId, patch) {
-    setState(s => ({ booths: { ...s.booths, [brandId]: { ...(s.booths[brandId] || {}), ...patch } } }));
-  },
-  resetBooth(brandId) {
-    setState(s => { const b = { ...s.booths }; delete b[brandId]; return { booths: b }; });
-  },
   toggleFav(brandId) {
     setState(s => {
       const has = (s.favorites || []).includes(brandId);
@@ -130,7 +83,7 @@ export const actions = {
   },
   resetAll() {
     try { localStorage.removeItem(STORE_KEY); } catch (e) {}
-    state = { cart: {}, orders: seedOrders(), retailer: 'Maison Bleu', booths: {}, favorites: [] };
+    state = { cart: {}, orders: seedOrders(), retailer: 'Maison Bleu', favorites: [] };
     emit();
   },
 };

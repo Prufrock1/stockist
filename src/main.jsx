@@ -13,7 +13,6 @@ const { useState, useEffect } = React;
 const TWEAK_DEFAULTS = {
   accent: 'oklch(0.42 0.15 280)',
   catalogLayout: 'index',   // image-forward feed — the default shopping view
-  floorStyle: 'concourse',
   density: 'regular',
 };
 
@@ -44,7 +43,7 @@ function Root() {
   return (
     <React.Fragment>
       {role === 'retailer'
-        ? <RetailerApp key={'rt-' + t.catalogLayout} layout={t.catalogLayout} floorStyle={t.floorStyle} />
+        ? <RetailerApp key={'rt-' + t.catalogLayout} layout={t.catalogLayout} />
         : <BrandApp key="bd" />}
 
       {/* role switcher */}
@@ -67,10 +66,6 @@ function Root() {
           <TweakRadio label="Layout" value={t.catalogLayout}
             options={['index', 'editorial', 'gallery']}
             onChange={v => setTweak('catalogLayout', v)} />
-          <TweakSection label="Trade floor" />
-          <TweakRadio label="Directory" value={t.floorStyle}
-            options={['concourse', 'isometric', 'aisle']}
-            onChange={v => setTweak('floorStyle', v)} />
           <TweakSection label="Brand dashboard" />
           <TweakRadio label="Density" value={t.density}
             options={['compact', 'regular', 'comfy']}

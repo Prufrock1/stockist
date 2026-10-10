@@ -30,18 +30,6 @@ export interface Product {
   imageUrl?: string;     // ADD in production (replaces the Ph placeholder)
 }
 
-// A brand's customisable 3D booth. Stored as a partial patch over defaultBooth().
-export interface BoothConfig {
-  accent: string;        // oklch; one of BOOTH_ACCENTS
-  kicker: string;        // signage eyebrow (defaults to brand.category)
-  tagline: string;       // signage tagline
-  heroId: string | null; // featured product on the back wall (FK → Product.id)
-  plinthIds: string[];   // 3 hero products on plinths (FK → Product.id)
-  floor: 'oak' | 'concrete' | 'travertine' | 'charcoal';
-  wall: 'plaster' | 'sand' | 'sage' | 'ink';
-  layout: 'gallery' | 'market';   // booth interior arrangement preset
-}
-
 export interface OrderItem { id: string; qty: number; }   // id = productId
 export type OrderStatus = 'new' | 'packing' | 'shipped';  // STATUS_FLOW, in order
 export interface Order {
@@ -58,6 +46,5 @@ export interface AppState {
   cart: Record<string, number>;                  // productId → qty
   orders: Order[];
   retailer: string;                              // current retailer identity
-  booths: Record<string, Partial<BoothConfig>>;  // brandId → saved edits
-  favorites: string[];                           // saved brandIds (booths)
+  favorites: string[];                           // saved brandIds
 }

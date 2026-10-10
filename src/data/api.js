@@ -13,13 +13,10 @@
      GET    /api/orders            (scoped to the session account)
      POST   /api/orders            { items: [{ id, qty }], note }
      PATCH  /api/orders/:id        { status }
-     GET    /api/booths/:brandId
-     PUT    /api/booths/:brandId   partial BoothConfig patch
-     DELETE /api/booths/:brandId   (reset to defaults)
      PUT    /api/favorites/:brandId · DELETE /api/favorites/:brandId
    ============================================================ */
 import {
-  BRANDS, PRODUCTS, store, actions, getBooth,
+  BRANDS, PRODUCTS, store, actions,
 } from './store.js';
 
 const delay = (ms = 0) => new Promise(r => setTimeout(r, ms));
@@ -51,19 +48,5 @@ export const api = {
   async setOrderStatus(id, status) {
     await delay();
     actions.setOrderStatus(id, status);
-  },
-
-  // ---- booths ----
-  async getBooth(brandId) {
-    await delay();
-    return getBooth(brandId);
-  },
-  async updateBooth(brandId, patch) {
-    await delay();
-    actions.updateBooth(brandId, patch);
-  },
-  async resetBooth(brandId) {
-    await delay();
-    actions.resetBooth(brandId);
   },
 };

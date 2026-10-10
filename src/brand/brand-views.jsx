@@ -13,7 +13,6 @@ export const NAV = [
     { id: 'overview', label: 'Overview', icon: 'chart' },
     { id: 'orders', label: 'Orders', icon: 'pkg' },
     { id: 'products', label: 'Products', icon: 'tag' },
-    { id: 'showroom', label: 'Showroom', icon: 'store' },
   ]},
   { sec: 'Grow', items: [
     { id: 'insights', label: 'Insights', icon: 'spark' },
@@ -27,7 +26,6 @@ export const HEADERS = {
   products: ['Products', 'Your catalogue and stock levels'],
   insights: ['Insights', 'Sell-through, margin and demand'],
   retailers: ['Retailers', 'Stockists carrying your brands'],
-  showroom: ['Showroom', 'Customize your booth — what retailers see on the trade floor'],
 };
 
 export function FilterBar({ children }) {
