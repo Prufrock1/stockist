@@ -8,7 +8,7 @@
    GET    /api/products?category=
    GET    /api/products/:id
    POST   /api/products               seller: { name, cat, unit, wp, rrp, moq, stock, blurb, image? }
-   GET    /api/orders                  buyer: own orders · seller: every order
+   GET    /api/orders                  buyer: own orders · seller: orders of their products only
    POST   /api/orders                  { items: [{ id, qty }], note }
    PATCH  /api/orders/:id              { status }
    GET    /api/favorites
@@ -218,11 +218,11 @@ async function handle(req, res) {
   }
 
   if (req.method === 'GET' && parts[1] === 'brands' && parts.length === 2) {
-    send(req, res, 200, await db.brands());
+    send(req, res, 200, await db.brands(session));
     return;
   }
   if (req.method === 'GET' && parts[1] === 'products' && parts.length === 4 && parts[3] === 'image') {
-    const image = await db.productImage(decodeURIComponent(parts[2]));
+    const image = await db.productImage(session, decodeURIComponent(parts[2]));
     if (!image) {
       send(req, res, 404, { error: 'Image not found.' });
       return;
@@ -241,11 +241,11 @@ async function handle(req, res) {
     return;
   }
   if (req.method === 'GET' && parts[1] === 'products' && parts.length === 2) {
-    send(req, res, 200, await db.products(url.searchParams.get('category') || undefined));
+    send(req, res, 200, await db.products(session, url.searchParams.get('category') || undefined));
     return;
   }
   if (req.method === 'GET' && parts[1] === 'products' && parts.length === 3) {
-    const product = await db.product(decodeURIComponent(parts[2]));
+    const product = await db.product(session, decodeURIComponent(parts[2]));
     if (!product) {
       send(req, res, 404, { error: 'Product not found.' });
       return;

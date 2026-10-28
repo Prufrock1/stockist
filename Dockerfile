@@ -12,7 +12,6 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 COPY --from=build --chown=node:node /app/dist ./dist
 COPY --chown=node:node server ./server
-COPY --chown=node:node src/data/seed.js ./src/data/seed.js
 USER node
 EXPOSE 8787
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
