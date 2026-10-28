@@ -34,7 +34,7 @@ the deployed site needs no SPA rewrite rule today — it will once a router land
 ## 5. Smaller items
 
 - Mobile is undefined below ~860px for the feed; the design is desktop-first.
-- `src/data/api.js` is the backend seam — all functions still resolve from the local store.
+- `src/data/api.js` talks to `server/`. The cart is still local. Catalogue, orders, and saved brands are in Postgres. Production sign-in is the password form; the role pill is the development shortcut.
 
 ## 6. Archived: 3D direction
 

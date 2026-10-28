@@ -7,5 +7,8 @@ export default defineConfig({
   // routing is in-memory; revisit if a real router is added.
   base: './',
   plugins: [react()],
-  server: { port: 5199 },
+  server: {
+    port: 5199,
+    proxy: { '/api': 'http://127.0.0.1:8787' },
+  },
 });

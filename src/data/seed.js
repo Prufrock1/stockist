@@ -1,7 +1,7 @@
 /* ============================================================
-   STOCKIST — seed catalogue data
-   In production this file is replaced by the API: brands,
-   products, and orders come from the server (see src/data/api.js).
+   STOCKIST — seed catalogue
+   Fixture for the API (server/db.js). The running app reads
+   brands, products, and orders from the server, not from here.
    ============================================================ */
 
 // ---- catalog tints (muted, refined) ----
@@ -69,4 +69,7 @@ export const seedOrders = () => ([
   { id:'ORD-4468', retailer:'Maison Bleu', items:[
       { id:'p13', qty:6 }, { id:'p16', qty:8 }, { id:'p17', qty:4 } ],
     status:'packing', placedAt: Date.now() - 1000*60*60*6, note:'' },
+  { id:'ORD-4466', retailer:'The Larder', items:[
+      { id:'p7', qty:2 }, { id:'p22', qty:2 } ],
+    status:'new', placedAt: Date.now() - 1000*60*60*3, note:'' },
 ]);

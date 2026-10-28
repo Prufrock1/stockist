@@ -3,8 +3,6 @@
    Derived fields, saved views, category colors for the dense
    operator's spreadsheet. Pure data — no UI.
    ============================================================ */
-import { BRANDS } from '../data/store.js';
-
 export const C_MARGIN = (p) => Math.round((1 - p.wp / p.rrp) * 100);
 
 // stable per-SKU demand series (12 weeks) + total
@@ -36,7 +34,7 @@ export const CAT_COLOR = {
 
 // saved views (smart filters) — predicate and/or default sort
 export const SAVED_VIEWS = [
-  { id: 'all', label: 'All products', ico: 'grid', summary: (n) => `All ${n} products across ${BRANDS.length} brands.` },
+  { id: 'all', label: 'All products', ico: 'grid', summary: (n) => `All ${n} products in the wholesale catalogue.` },
   { id: 'low', label: 'Low stock', ico: 'bolt', pred: (p) => p.stock < 20, sort: { key: 'stock', dir: 1 }, summary: (n) => `${n} SKUs are running low — reorder candidates, sorted by stock.` },
   { id: 'margin', label: 'Best margin', ico: 'spark', sort: { key: 'margin', dir: -1 }, summary: (n) => `${n} products ranked by retail margin, highest first.` },
   { id: 'newin', label: 'New this season', ico: 'tag', pred: (p) => C_NEW.has(p.id), summary: (n) => `${n} new arrivals just added to the catalogue.` },

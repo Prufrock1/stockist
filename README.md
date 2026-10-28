@@ -17,15 +17,17 @@ They are preserved on the `archive/3d-showroom` branch (tag `archive-3d-showroom
 
 ```bash
 npm install
-npm run dev        # http://localhost:5199
+npm run dev        # app http://localhost:5199  ·  API http://localhost:8787
+npm test           # API tests against Postgres
 ```
 
-- The floating pill at the bottom switches between the **Retailer** and **Brand** apps
-  (a demo device — replace with real auth).
-- Append `?dev` to the URL for the design-tweaks panel (accent, catalogue layout,
-  dashboard density, demo-data reset).
-- App state persists to `localStorage` under `stockist:v4`; reset via the tweaks
-  panel or `localStorage.removeItem('stockist:v4')`.
+`npm run dev` starts Postgres on port 54329 when `DATABASE_URL` is unset
+(data in `server/data/pg`, gitignored), then the API and the Vite app.
+Vite proxies `/api`. Development signs you in as the retailer or the brand
+from the bottom pill. Passwords, if you need them, are `maison` and `verre`.
+
+`?dev` opens the design-tweaks panel. “Reset orders & cart” restores the
+seed catalogue. The cart stays in `localStorage` under `stockist:v5`.
 
 ## Structure
 
@@ -35,9 +37,11 @@ src/
   styles/tokens.css      design tokens (oklch palette, type, radii, shadows)
   components/ui.jsx      Ico (icon set) · Ph (product-image placeholder)
   data/
-    seed.js              seed catalogue (8 brands, 24 products) — REPLACED by the API
-    store.js             client store (pub/sub + useStore hook) + actions + selectors
-    api.js               ★ the backend seam — swap bodies for fetch() calls
+    seed.js              fixture imported by the API on first boot and on reset
+    store.js             session cart + a mirror of the latest server data
+    api.js               fetch client for /api (cookie session)
+server/                  Node API: Postgres, migrations, signed sessions
+Dockerfile               production image (static app + API, one process)
     types.d.ts           data contract (Brand, Product, Order, …)
   retailer/              shopping shell, PDP, cart drawer, confirm, order history
   brand/                 dashboard shell, overview, orders, products, insights, charts
@@ -55,25 +59,58 @@ and a detail drawer. Its chat replies are scripted today; it is the starting poi
 the agentic direction. Product thumbnails come from `loremflickr.com` with a tonal
 fallback when offline; replace with `Product.imageUrl`.
 
-## Adding the backend
+## Backend
 
-The handoff README's plan, already prepared here:
+Node (`node:http` + `pg`) and Postgres. `types.d.ts` is the response contract.
+Orders and stock updates run in one transaction with a row lock. Sign-in is
+`POST /api/session` with a password; the session is a signed HttpOnly cookie.
+A retailer sees only their orders and is the only one who can place one. The
+brand studio sees every order and is the only one who can move status along
+`new → packing → shipped`. Saved brands are stored per account. The demo pill
+exists only when `ALLOW_DEMO_LOGIN=true`, which production refuses.
 
-1. **Contract**: `src/data/types.d.ts` holds the entity shapes. Use them as your DB
-   schema / API response types. Suggested endpoints are listed at the top of
-   `src/data/api.js`.
-2. **Swap the data source**: implement the endpoints, then replace the bodies in
-   `src/data/api.js` with `fetch()` calls. Route the store's actions through `api.*`
-   and keep only session state (cart, favourites, current view) client-side.
-   `seed.js` becomes DB fixtures/tests.
-3. **Auth & roles**: the bottom role-switch pill is a demo device. With real sessions,
-   a retailer login renders `<RetailerApp/>`, a brand login renders `<BrandApp/>`
-   (scoped to their own products/orders) — then delete the switch from
-   `main.jsx`. `state.retailer` ('Maison Bleu') comes from the session instead.
-4. **Routing**: views are in-memory React state (`view` in RetailerApp, `nav` in
-   BrandApp). Introduce React Router when URLs need to be shareable.
-5. **Images**: the `Ph` placeholder renders `product.tint`/`marks`. Populate
-   `Product.imageUrl` and swap `Ph` for `<img>` in `components/ui.jsx`.
+```
+POST   /api/session             { role, password }
+GET    /api/session
+DELETE /api/session
+GET    /api/health
+GET    /api/brands
+GET    /api/products?category=
+GET    /api/products/:id
+GET    /api/orders
+POST   /api/orders              { items: [{ id, qty }], note }
+PATCH  /api/orders/:id          { status }
+GET    /api/favorites
+PUT    /api/favorites/:brandId
+DELETE /api/favorites/:brandId
+POST   /api/reset               development only
+```
+
+### AWS
+
+Build the image and run it on App Runner or Fargate, with RDS Postgres. The
+process serves the built frontend and the API on `PORT`. Point the load
+balancer at `GET /api/health`.
+
+```bash
+docker build -t stockist .
+docker run --rm -p 8787:8787 \
+  -e DATABASE_URL='postgres://…@your-rds-host:5432/stockist?sslmode=require' \
+  -e SESSION_SECRET="$(openssl rand -hex 32)" \
+  -e RETAILER_PASSWORD='…' \
+  -e BRAND_PASSWORD='…' \
+  -e TRUST_PROXY=true \
+  stockist
+```
+
+Set `sslmode=verify-full` once the RDS CA bundle is available.
+`CORS_ORIGIN` is only needed if the frontend is hosted on a different origin.
+On first boot the API migrates and loads the seed catalogue when the database
+is empty. Account passwords come from the environment on every boot.
+`POST /api/reset` and the role pill are off in production; sign in with the
+password form. See `.env.example`.
+
+Still open: shareable URLs, and real product photography via `Product.imageUrl`.
 
 ## Notes
 

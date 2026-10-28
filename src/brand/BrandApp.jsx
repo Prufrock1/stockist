@@ -86,6 +86,7 @@ function RetailersView() {
 const FLOW_LABELS = { new: 'Received', packing: 'Packing', shipped: 'Shipped' };
 function OrderDrawer({ id, onClose }) {
   const s = useStore();
+  const [statusError, setStatusError] = React.useState(null);
   React.useEffect(() => { document.body.classList.add('modal-open'); return () => document.body.classList.remove('modal-open'); }, []);
   const o = s.orders.find(x => x.id === id);
   if (!o) return null;
@@ -138,10 +139,15 @@ function OrderDrawer({ id, onClose }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 13, color: 'var(--ink-2)', marginBottom: 11 }}><span>Freight</span><span style={{ color: 'var(--ink-3)' }}>Billed at dispatch</span></div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 17, paddingTop: 10, borderTop: '1px solid var(--line)' }}><span>Order total</span><span>{money(subtotal)}</span></div>
           </div>
+          {statusError && <div style={{ color: 'var(--danger)', fontSize: 13, marginTop: 14 }}>{statusError}</div>}
         </div>
         <div className="drawer-f">
           {next ? (
-            <button className="btn btn-pri" style={{ flex: 1, justifyContent: 'center' }} onClick={() => actions.advanceOrder(o.id)}>
+            <button className="btn btn-pri" style={{ flex: 1, justifyContent: 'center' }} onClick={async () => {
+              setStatusError(null);
+              try { await actions.advanceOrder(o.id); }
+              catch (err) { setStatusError(err.message); }
+            }}>
               <Ico name={next === 'shipped' ? 'truck' : 'box'} size={15} />
               {next === 'packing' ? 'Start packing' : 'Mark as shipped'}
             </button>
