@@ -75,7 +75,7 @@ export function RetailerApp({ layout, onSignOut }) {
   const [lastOrder, setLastOrder] = React.useState(null);
   const [toast, setToast] = React.useState(null);
 
-  const cartCount = Object.keys(s.cart).length;
+  const cartCount = (s.ready ? Object.keys(s.cart).filter(id => productById(id)) : Object.keys(s.cart)).length;
 
   const flash = (msg) => { setToast(msg); clearTimeout(window.__rtToast); window.__rtToast = setTimeout(() => setToast(null), 1900); };
 

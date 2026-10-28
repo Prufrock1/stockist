@@ -89,13 +89,21 @@ export const actions = {
       if (gen !== hydrateGen) return false;
       replaceAll(BRANDS, brands);
       replaceAll(PRODUCTS, products);
-      setState({
-        orders,
-        favorites,
-        retailer: session.account,
-        ready: true,
-        error: null,
-        sessionRole: session.role,
+      const liveIds = new Set(products.map(product => product.id));
+      setState(prev => {
+        const cart = { ...prev.cart };
+        for (const id of Object.keys(cart)) {
+          if (!liveIds.has(id)) delete cart[id];
+        }
+        return {
+          cart,
+          orders,
+          favorites,
+          retailer: session.account,
+          ready: true,
+          error: null,
+          sessionRole: session.role,
+        };
       });
       return true;
     } catch (err) {

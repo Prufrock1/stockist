@@ -144,6 +144,7 @@ img.card-img { object-fit: cover; }
 .cart-b { flex: 1; overflow-y: auto; padding: 8px 26px; }
 .cart-line { display: flex; gap: 16px; padding: 20px 0; border-bottom: 1px solid var(--line); }
 .cart-line .cl-img { width: 72px; height: 90px; border-radius: var(--r-sm); flex-shrink: 0; }
+img.cl-img { object-fit: cover; display: block; }
 .cart-line .cl-mid { flex: 1; min-width: 0; }
 .cart-line .cl-brand { font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); }
 .cart-line .cl-name { font-size: 14px; font-weight: 600; color: var(--ink); margin: 3px 0 8px; }

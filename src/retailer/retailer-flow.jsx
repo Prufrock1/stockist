@@ -1,5 +1,7 @@
 import React from 'react';
 import { productById, brandById, money, useStore, actions, STATUS_FLOW, orderLines, orderSubtotal, orderUnits } from '../data/store.js';
+import { productImage } from '../data/images.js';
+import { ProdImg } from '../components/ProductImage.jsx';
 import { Ico, Ph } from '../components/ui.jsx';
 
 /* ============================================================
@@ -116,7 +118,7 @@ export function CartDrawer({ onClose, onPlaced, goCatalog }) {
             <div className="cart-b">
               {lines.map(({ p, qty }) => (
                 <div className="cart-line" key={p.id}>
-                  <Ph className="cl-img" tint={p.tint} marks={p.marks} showMark={false} cap="" />
+                  <ProdImg className="cl-img" src={productImage(p)} p={p} />
                   <div className="cl-mid">
                     <div className="cl-brand">{brandById(p.b).name}</div>
                     <div className="cl-name">{p.name}</div>
@@ -135,7 +137,7 @@ export function CartDrawer({ onClose, onPlaced, goCatalog }) {
             </div>
             <div className="cart-f">
               <div className="cart-totals">
-                <div className="tr"><span>{entries.length} product line{entries.length > 1 ? 's' : ''} · {units} units</span><span></span></div>
+                <div className="tr"><span>{lines.length} product line{lines.length === 1 ? '' : 's'} · {units} units</span><span></span></div>
                 <div className="tr"><span>Subtotal (wholesale)</span><span>{money(subtotal)}</span></div>
                 <div className="tr"><span>Freight</span><span style={{ color: 'var(--ink-3)' }}>Billed at dispatch</span></div>
                 <div className="tr grand"><span>Est. total</span><span>{money(subtotal)}</span></div>
