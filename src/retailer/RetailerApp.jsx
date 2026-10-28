@@ -127,7 +127,7 @@ export function RetailerApp({ layout, onSignOut }) {
       {view === 'catalog' && (
         <React.Fragment>
           <div className="rt-hero">
-            <div className="rt-hero-tag"><span className="ln"></span><span className="mono-label">Wholesale · {BRANDS.length} brands · {PRODUCTS.length} products</span></div>
+            <div className="rt-hero-tag"><span className="ln"></span><span className="mono-label">Wholesale · {BRANDS.length} {BRANDS.length === 1 ? 'brand' : 'brands'} · {PRODUCTS.length} {PRODUCTS.length === 1 ? 'product' : 'products'}</span></div>
             <h1>The wholesale floor for <em>independent</em> retail.</h1>
             <div className="rt-hero-lead">
               <p>Buy directly from the makers you want on your shelves — small-batch food, considered apparel, hand-made homeware. One trade account, one order, net-30 terms.</p>
