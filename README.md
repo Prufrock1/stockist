@@ -27,8 +27,9 @@ Vite proxies `/api`. Sign in, or create a buyer or seller account. The sample
 buyer is `maison@stockist.test` / `maison`. The sample seller is
 `verre@stockist.test` / `verre`.
 
-`?dev` opens the design-tweaks panel. “Reset orders & cart” restores the
-seed catalogue. The cart stays in `localStorage` under `stockist:v5`.
+`?dev` opens the design-tweaks panel. “Reset orders & cart” clears orders
+and products, then recreates each seller’s empty brand. The cart stays in
+`localStorage` under `stockist:v5`.
 
 ## Structure
 
@@ -38,7 +39,6 @@ src/
   styles/tokens.css      design tokens (oklch palette, type, radii, shadows)
   components/ui.jsx      Ico (icon set) · Ph (product-image placeholder)
   data/
-    seed.js              fixture imported by the API on first boot and on reset
     store.js             session cart + a mirror of the latest server data
     api.js               fetch client for /api (cookie session)
 server/                  Node API: Postgres, migrations, signed sessions

@@ -64,6 +64,25 @@ async function cookieFor(role) {
   return jars[role];
 }
 
+async function addProduct(overrides = {}) {
+  const created = await call('POST', '/api/products', {
+    role: 'brand',
+    body: {
+      name: 'House Tonic',
+      cat: 'Food & Drink',
+      unit: 'case of 12',
+      wp: 30,
+      rrp: 54,
+      moq: 4,
+      stock: 40,
+      blurb: 'A house tonic.',
+      ...overrides,
+    },
+  });
+  assert.equal(created.status, 201, created.body.error || 'create product failed');
+  return created.body;
+}
+
 async function call(method, pathname, { role = 'retailer', body, auth = true, headers = {} } = {}) {
   const res = await fetch(base + pathname, {
     method,
@@ -108,79 +127,104 @@ describe('stockist api', { concurrency: false, timeout: 120_000 }, () => {
     assert.ok(spoofed.body.every(order => order.retailer === 'Maison Bleu'));
   });
 
-  test('serves the seed catalogue', async () => {
+  test('starts with the seller brand and an empty catalogue', async () => {
     const brands = await call('GET', '/api/brands');
     const products = await call('GET', '/api/products');
-    const drink = await call('GET', '/api/products?category=Food%20%26%20Drink');
-    const one = await call('GET', '/api/products/p1');
+    const sellerBrands = await call('GET', '/api/brands', { role: 'brand' });
     assert.equal(brands.status, 200);
-    assert.equal(brands.body.length, 9);
-    assert.ok(brands.body.some(brand => brand.id === 'brand-verre-group' && brand.name === 'Verre Group'));
-    assert.equal(products.body.length, 24);
-    assert.equal(products.body[0].id, 'p1');
-    assert.equal(products.body[9].id, 'p10');
-    assert.ok(drink.body.every(product => product.cat === 'Food & Drink'));
-    assert.equal(one.body.name, 'Yuzu & Verbena Spritz');
+    assert.deepEqual(brands.body.map(brand => brand.id), ['brand-verre-group']);
+    assert.equal(brands.body[0].name, 'Verre Group');
+    assert.deepEqual(products.body, []);
+    assert.deepEqual(sellerBrands.body.map(brand => brand.id), ['brand-verre-group']);
     assert.equal((await call('GET', '/api/products/nope')).status, 404);
     assert.equal((await call('GET', '/api/products?category=Nope')).status, 400);
   });
 
   test('scopes orders and decrements stock', async () => {
-    const before = await call('GET', '/api/products/p15');
-    const placed = await call('POST', '/api/orders', { body: { items: [{ id: 'p15', qty: 6 }], note: 'back bar' } });
+    const product = await addProduct({ name: 'Bar Syrup', stock: 20, moq: 4 });
+    const placed = await call('POST', '/api/orders', { body: { items: [{ id: product.id, qty: 6 }], note: 'back bar' } });
     assert.equal(placed.status, 201);
     assert.equal(placed.body.status, 'new');
     assert.equal(placed.body.retailer, 'Maison Bleu');
     assert.equal(placed.body.note, 'back bar');
     assert.match(placed.body.id, /^ORD-\d+$/);
 
-    const after = await call('GET', '/api/products/p15');
-    assert.equal(after.body.stock, before.body.stock - 6);
+    const after = await call('GET', '/api/products/' + product.id);
+    assert.equal(after.body.stock, 14);
 
     const mine = await call('GET', '/api/orders');
     assert.ok(mine.body.some(order => order.id === placed.body.id));
     assert.ok(mine.body.every(order => order.retailer === 'Maison Bleu'));
 
-    const all = await call('GET', '/api/orders', { role: 'brand' });
-    assert.ok(all.body.some(order => order.id === placed.body.id));
-    assert.ok(all.body.some(order => order.retailer === 'The Larder'));
+    const own = await call('GET', '/api/orders', { role: 'brand' });
+    assert.ok(own.body.some(order => order.id === placed.body.id));
 
     const denied = await call('PATCH', `/api/orders/${placed.body.id}`, { body: { status: 'packing' } });
     assert.equal(denied.status, 403);
     const packed = await call('PATCH', `/api/orders/${placed.body.id}`, { role: 'brand', body: { status: 'packing' } });
     assert.equal(packed.body.status, 'packing');
+
+    const other = await fetch(base + '/api/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: 'brand', name: 'Other Studio', email: `other-${Date.now()}@example.com`, password: 'other-studio' }),
+    });
+    const otherCookie = other.headers.getSetCookie().map(entry => entry.split(';')[0]).join('; ');
+    const hidden = await fetch(base + '/api/products/' + product.id, { headers: { cookie: otherCookie } });
+    assert.equal(hidden.status, 404);
+    const foreignOrder = await fetch(base + `/api/orders/${placed.body.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', cookie: otherCookie },
+      body: JSON.stringify({ status: 'shipped' }),
+    });
+    assert.equal(foreignOrder.status, 404);
   });
 
-  test('rejects short and oversold lines', async () => {
-    const short = await call('POST', '/api/orders', { body: { items: [{ id: 'p1', qty: 1 }] } });
+  test('rejects short, oversold, and mixed-seller lines', async () => {
+    const product = await addProduct({ name: 'Short Pour', moq: 4, stock: 8 });
+    const short = await call('POST', '/api/orders', { body: { items: [{ id: product.id, qty: 1 }] } });
     assert.equal(short.status, 400);
-    const product = await call('GET', '/api/products/p9');
-    const over = await call('POST', '/api/orders', { body: { items: [{ id: 'p9', qty: product.body.stock + 1 }] } });
+    const over = await call('POST', '/api/orders', { body: { items: [{ id: product.id, qty: 9 }] } });
     assert.equal(over.status, 409);
+
+    const other = await fetch(base + '/api/signup', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role: 'brand', name: 'Second Studio', email: `second-${Date.now()}@example.com`, password: 'second-studio' }),
+    });
+    const otherCookie = other.headers.getSetCookie().map(entry => entry.split(';')[0]).join('; ');
+    const theirs = await fetch(base + '/api/products', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', cookie: otherCookie },
+      body: JSON.stringify({ name: 'Other Oil', cat: 'Beauty', unit: 'each', wp: 10, rrp: 20, moq: 1, stock: 10, blurb: 'Another studio.' }),
+    });
+    const theirsBody = await theirs.json();
+    const mixed = await call('POST', '/api/orders', { body: { items: [{ id: product.id, qty: 4 }, { id: theirsBody.id, qty: 1 }] } });
+    assert.equal(mixed.status, 400);
   });
 
-  test('keeps favourites on the signed-in account and resets the fixture', async () => {
-    const saved = await call('PUT', '/api/favorites/b3');
-    assert.deepEqual(saved.body, ['b3']);
+  test('keeps favourites on the signed-in account and clears the catalogue', async () => {
+    const saved = await call('PUT', '/api/favorites/brand-verre-group');
+    assert.deepEqual(saved.body, ['brand-verre-group']);
     assert.deepEqual((await call('GET', '/api/favorites', { role: 'brand' })).body, []);
-    assert.deepEqual((await call('DELETE', '/api/favorites/b3')).body, []);
+    assert.deepEqual((await call('DELETE', '/api/favorites/brand-verre-group')).body, []);
 
     const reset = await call('POST', '/api/reset');
     assert.equal(reset.status, 200);
-    const product = await call('GET', '/api/products/p15');
-    assert.equal(product.body.stock, 8);
+    assert.deepEqual((await call('GET', '/api/products')).body, []);
     const orders = await call('GET', '/api/orders', { role: 'brand' });
-    assert.equal(orders.body.some(order => order.note === 'back bar'), false);
+    assert.deepEqual(orders.body, []);
   });
 
   test('only one of two concurrent orders can take the last stock', async () => {
+    const product = await addProduct({ name: 'Last Case', moq: 1, stock: 140 });
     const [first, second] = await Promise.all([
-      call('POST', '/api/orders', { body: { items: [{ id: 'p23', qty: 100 }] } }),
-      call('POST', '/api/orders', { body: { items: [{ id: 'p23', qty: 100 }] } }),
+      call('POST', '/api/orders', { body: { items: [{ id: product.id, qty: 100 }] } }),
+      call('POST', '/api/orders', { body: { items: [{ id: product.id, qty: 100 }] } }),
     ]);
     assert.deepEqual([first.status, second.status].sort(), [201, 409]);
-    const product = await call('GET', '/api/products/p23');
-    assert.equal(product.body.stock, 40);
+    const after = await call('GET', '/api/products/' + product.id);
+    assert.equal(after.body.stock, 40);
   });
 
   test('a seller can add a product and a buyer cannot', async () => {
@@ -260,9 +304,8 @@ describe('stockist api', { concurrency: false, timeout: 120_000 }, () => {
     assert.equal(sellerBody.role, 'brand');
     const sellerCookie = seller.headers.getSetCookie().map(entry => entry.split(';')[0]).join('; ');
     const all = await fetch(base + '/api/orders', { headers: { cookie: sellerCookie } });
-    const allBody = await all.json();
     assert.equal(all.status, 200);
-    assert.ok(allBody.some(order => order.retailer === 'The Larder'));
+    assert.deepEqual(await all.json(), []);
 
     const ownProduct = await fetch(base + '/api/products', {
       method: 'POST',
@@ -274,7 +317,14 @@ describe('stockist api', { concurrency: false, timeout: 120_000 }, () => {
     assert.notEqual(ownBody.b, 'b1');
     const brands = await fetch(base + '/api/brands', { headers: { cookie: sellerCookie } });
     const brandList = await brands.json();
-    assert.equal(brandList.find(brand => brand.id === ownBody.b).name, 'North Studio');
+    assert.deepEqual(brandList.map(brand => brand.id), [ownBody.b]);
+    assert.equal(brandList[0].name, 'North Studio');
+    const sellerList = await fetch(base + '/api/products', { headers: { cookie: sellerCookie } });
+    assert.deepEqual((await sellerList.json()).map(product => product.id), [ownBody.id]);
+    const hidden = await fetch(base + '/api/products/' + ownBody.id, { headers: { cookie: await cookieFor('brand') } });
+    assert.equal(hidden.status, 404);
+    const visible = await fetch(base + '/api/products/' + ownBody.id, { headers: { cookie: buyerCookie } });
+    assert.equal(visible.status, 200);
 
     const duplicate = await fetch(base + '/api/signup', {
       method: 'POST',
