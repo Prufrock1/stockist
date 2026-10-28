@@ -65,7 +65,7 @@ function ProductCard({ p, layout, onOpen, onQuickAdd }) {
   );
 }
 
-export function RetailerApp({ layout }) {
+export function RetailerApp({ layout, onSignOut }) {
   const s = useStore();
   const [view, setView] = React.useState('catalog');
   const [activeId, setActiveId] = React.useState(null);
@@ -98,7 +98,7 @@ export function RetailerApp({ layout }) {
   // retailer chrome entirely and offers its own way back.
   if (view === 'console') return (
     <React.Suspense fallback={<Loading label="Opening the console…" />}>
-      <ConsoleApp onExit={goCatalog} />
+      <ConsoleApp onExit={goCatalog} onSignOut={onSignOut} />
     </React.Suspense>
   );
 
@@ -113,7 +113,8 @@ export function RetailerApp({ layout }) {
           </div>
           <div className="rt-logo" onClick={goCatalog}>STOCKIST</div>
           <div className="rt-navright">
-            <span className="rt-trade">{s.retailer} · trade</span>
+            <span className="rt-trade">{s.retailer}</span>
+            <button type="button" className="nav-logout" onClick={onSignOut}>Log out</button>
             <span className="rt-icon" onClick={() => { setView('orders'); window.scrollTo(0, 0); }}><Ico name="clip" size={18} /></span>
             <span className="rt-icon" onClick={() => setCartOpen(true)}>
               <Ico name="bag" size={19} />

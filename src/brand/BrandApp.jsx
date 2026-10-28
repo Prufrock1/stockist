@@ -2,7 +2,7 @@ import React from 'react';
 import { CATEGORIES, brandById, money, useStore, actions, STATUS_FLOW, orderLines, orderSubtotal, orderUnits } from '../data/store.js';
 import { Ico, Ph } from '../components/ui.jsx';
 import { HBars, StackedChart, WEEK, CAT_COLORS } from './charts.jsx';
-import { Overview, OrdersView, ProductsView, NAV, HEADERS, timeAgo } from './brand-views.jsx';
+import { Overview, OrdersView, ProductsView, NewProductPage, NAV, HEADERS, timeAgo } from './brand-views.jsx';
 import './brand.css';
 
 /* ============================================================
@@ -164,7 +164,7 @@ function OrderDrawer({ id, onClose }) {
 }
 
 // ---------- Brand app shell ----------
-export function BrandApp() {
+export function BrandApp({ onSignOut }) {
   const s = useStore();
   const [nav, setNav] = React.useState(() => {
     const saved = localStorage.getItem('stockist:bdNav');
@@ -176,6 +176,7 @@ export function BrandApp() {
   const [title, sub] = HEADERS[nav];
 
   const openOrder = (id) => setDrawer(id);
+  const openNewProduct = () => setNav('new-product');
 
   return (
     <div className="bd role-stage">
@@ -200,10 +201,10 @@ export function BrandApp() {
           ))}
         </nav>
         <div className="bd-sideftr">
-          <div className="bd-avatar">V</div>
+          <div className="bd-avatar">{(s.retailer || 'S').slice(0, 1)}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Verre Group</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-3)' }}>8 brands</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.retailer}</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-3)' }}>Seller</div>
           </div>
           <Ico name="gear" size={16} style={{ color: 'var(--ink-3)' }} />
         </div>
@@ -217,13 +218,15 @@ export function BrandApp() {
           </div>
           <div className="spacer"></div>
           <div className="pill" style={{ cursor: 'default' }}><Ico name="search" size={14} /><span style={{ color: 'var(--ink-3)' }}>Search</span></div>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={onSignOut}>Log out</button>
           <button className="btn btn-ghost btn-sm"><Ico name="external" size={14} /> Export</button>
-          <button className="btn btn-pri btn-sm"><Ico name="plus" size={14} /> New product</button>
+          <button type="button" className="btn btn-pri btn-sm" onClick={openNewProduct}><Ico name="plus" size={14} /> New product</button>
         </div>
 
         {nav === 'overview' && <Overview openOrder={openOrder} />}
         {nav === 'orders' && <OrdersView openOrder={openOrder} />}
-        {nav === 'products' && <ProductsView />}
+        {nav === 'products' && <ProductsView onNew={openNewProduct} />}
+        {nav === 'new-product' && <NewProductPage onDone={() => setNav('products')} />}
         {nav === 'insights' && <InsightsView />}
         {nav === 'retailers' && <RetailersView />}
       </main>

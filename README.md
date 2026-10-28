@@ -23,8 +23,9 @@ npm test           # API tests against Postgres
 
 `npm run dev` starts Postgres on port 54329 when `DATABASE_URL` is unset
 (data in `server/data/pg`, gitignored), then the API and the Vite app.
-Vite proxies `/api`. Development signs you in as the retailer or the brand
-from the bottom pill. Passwords, if you need them, are `maison` and `verre`.
+Vite proxies `/api`. Sign in, or create a buyer or seller account. The sample
+buyer is `maison@stockist.test` / `maison`. The sample seller is
+`verre@stockist.test` / `verre`.
 
 `?dev` opens the design-tweaks panel. “Reset orders & cart” restores the
 seed catalogue. The cart stays in `localStorage` under `stockist:v5`.
@@ -33,7 +34,7 @@ seed catalogue. The cart stays in `localStorage` under `stockist:v5`.
 
 ```
 src/
-  main.jsx               entry: Root, role switch, tweaks mount
+  main.jsx               entry: Root, sign-in gate, tweaks mount
   styles/tokens.css      design tokens (oklch palette, type, radii, shadows)
   components/ui.jsx      Ico (icon set) · Ph (product-image placeholder)
   data/
@@ -62,21 +63,23 @@ fallback when offline; replace with `Product.imageUrl`.
 ## Backend
 
 Node (`node:http` + `pg`) and Postgres. `types.d.ts` is the response contract.
-Orders and stock updates run in one transaction with a row lock. Sign-in is
-`POST /api/session` with a password; the session is a signed HttpOnly cookie.
-A retailer sees only their orders and is the only one who can place one. The
-brand studio sees every order and is the only one who can move status along
-`new → packing → shipped`. Saved brands are stored per account. The demo pill
-exists only when `ALLOW_DEMO_LOGIN=true`, which production refuses.
+Orders and stock updates run in one transaction with a row lock. A buyer
+(role `retailer`) and a seller (role `brand`) each sign up, then sign in with
+email and password. The session is a signed HttpOnly cookie. A buyer sees only
+their orders and is the only one who can place one. A seller sees every order
+and is the only one who can move status along `new → packing → shipped`.
+Saved brands are stored per account.
 
 ```
-POST   /api/session             { role, password }
+POST   /api/signup              { role, name, email, password }
+POST   /api/session             { email, password }
 GET    /api/session
 DELETE /api/session
 GET    /api/health
 GET    /api/brands
 GET    /api/products?category=
 GET    /api/products/:id
+POST   /api/products           { name, cat, unit, wp, rrp, moq, stock, blurb }
 GET    /api/orders
 POST   /api/orders              { items: [{ id, qty }], note }
 PATCH  /api/orders/:id          { status }
@@ -86,29 +89,22 @@ DELETE /api/favorites/:brandId
 POST   /api/reset               development only
 ```
 
-### AWS
+### Deploy
 
-Build the image and run it on App Runner or Fargate, with RDS Postgres. The
-process serves the built frontend and the API on `PORT`. Point the load
-balancer at `GET /api/health`.
+`main` is production. Do the work on a branch and open a pull request into
+`main`. Merging runs the tests, then GitHub Actions builds the image and
+updates the ECS service that serves https://stockist.pro. See
+`.github/workflows/deploy.yml`. GitHub Pages is no longer the production host.
 
-```bash
-docker build -t stockist .
-docker run --rm -p 8787:8787 \
-  -e DATABASE_URL='postgres://…@your-rds-host:5432/stockist?sslmode=require' \
-  -e SESSION_SECRET="$(openssl rand -hex 32)" \
-  -e RETAILER_PASSWORD='…' \
-  -e BRAND_PASSWORD='…' \
-  -e TRUST_PROXY=true \
-  stockist
-```
+The service reads `DATABASE_URL`, `SESSION_SECRET`, `RETAILER_PASSWORD`, and
+`BRAND_PASSWORD` from SSM. On first boot the API migrates and loads the seed
+catalogue when the database is empty. Account passwords come from the
+environment on every boot. `POST /api/reset` is off in production. Sign in
+with email and password, or create a buyer or seller account. See
+`.env.example`.
 
-Set `sslmode=verify-full` once the RDS CA bundle is available.
 `CORS_ORIGIN` is only needed if the frontend is hosted on a different origin.
-On first boot the API migrates and loads the seed catalogue when the database
-is empty. Account passwords come from the environment on every boot.
-`POST /api/reset` and the role pill are off in production; sign in with the
-password form. See `.env.example`.
+Set `sslmode=verify-full` once the RDS CA bundle is available.
 
 Still open: shareable URLs, and real product photography via `Product.imageUrl`.
 

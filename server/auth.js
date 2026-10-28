@@ -20,8 +20,9 @@ export async function verifyPassword(password, stored) {
   return timingSafeEqual(expected, actual);
 }
 
-export function signSession({ role, account }) {
+export function signSession({ userId, role, account }) {
   const body = Buffer.from(JSON.stringify({
+    userId,
     role,
     account,
     exp: Date.now() + config.sessionTtlMs,
@@ -42,9 +43,10 @@ export function readSession(token) {
   try {
     const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8'));
     if (payload.role !== 'retailer' && payload.role !== 'brand') return null;
+    if (typeof payload.userId !== 'string' || !payload.userId) return null;
     if (typeof payload.account !== 'string' || !payload.account) return null;
     if (typeof payload.exp !== 'number' || payload.exp < Date.now()) return null;
-    return { role: payload.role, account: payload.account };
+    return { userId: payload.userId, role: payload.role, account: payload.account };
   } catch {
     return null;
   }

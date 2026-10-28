@@ -1,5 +1,6 @@
 /* Catalogue, orders, and accounts in Postgres.
    Stock changes and order inserts share one transaction. */
+import { randomBytes } from 'node:crypto';
 import pg from 'pg';
 import { BRANDS, PRODUCTS, seedOrders } from '../src/data/seed.js';
 import { config } from './config.js';
@@ -8,6 +9,45 @@ import { migrate } from './migrate.js';
 
 const { Pool } = pg;
 const CATEGORIES = new Set(['Food & Drink', 'Apparel', 'Home', 'Beauty', 'Accessories']);
+const TINTS = {
+  'Food & Drink': 'oklch(0.90 0.03 150)',
+  Apparel: 'oklch(0.89 0.012 250)',
+  Home: 'oklch(0.91 0.03 85)',
+  Beauty: 'oklch(0.90 0.035 20)',
+  Accessories: 'oklch(0.88 0.012 70)',
+};
+
+function wholeNumber(value, message, min, max) {
+  if (value === '' || value === null || value === undefined) throw HttpError(400, message);
+  const n = typeof value === 'number' ? value : Number(String(value).trim());
+  if (!Number.isInteger(n) || n < min || n > max) throw HttpError(400, message);
+  return n;
+}
+
+function imageOf(value) {
+  if (!value) return null;
+  const type = value.type;
+  if (type !== 'image/jpeg' && type !== 'image/png' && type !== 'image/webp') {
+    throw HttpError(400, 'Use a JPEG, PNG, or WebP image.');
+  }
+  const data = String(value.data || '').replace(/^data:[^;]+;base64,/, '');
+  const bytes = Buffer.from(data, 'base64');
+  if (bytes.length < 32 || bytes.length > 1_500_000 || !imageLooksValid(type, bytes)) {
+    throw HttpError(400, 'That image could not be read. Use a JPEG, PNG, or WebP under 1.5 MB.');
+  }
+  return { type, bytes };
+}
+
+function imageLooksValid(type, bytes) {
+  if (type === 'image/png') return bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47;
+  if (type === 'image/jpeg') return bytes[0] === 0xff && bytes[1] === 0xd8;
+  return bytes.toString('ascii', 0, 4) === 'RIFF' && bytes.toString('ascii', 8, 12) === 'WEBP';
+}
+function marksOf(name) {
+  const words = name.split(/\s+/).filter(word => /[A-Za-z0-9]/.test(word));
+  const letters = words.length >= 2 ? words[0][0] + words[1][0] : name.replace(/[^A-Za-z0-9]/g, '').slice(0, 2);
+  return (letters || 'NP').toUpperCase();
+}
 const STATUSES = new Set(['new', 'packing', 'shipped']);
 const LOGIN_LIMIT = 8;
 
@@ -54,6 +94,8 @@ function orderOf(row) {
     note: row.note,
   };
 }
+
+const PRODUCT_COLUMNS = 'id, brand_id, name, cat, unit, wp, rrp, moq, stock, tint, marks, blurb, image_url, position';
 
 const ORDER_SQL = `
   SELECT o.id, o.retailer, o.status, o.note,
@@ -121,9 +163,10 @@ async function seedCatalogue(client) {
   }
   for (const order of seedOrders()) {
     await client.query(
-      `INSERT INTO orders (id, retailer, status, placed_at, note)
-       VALUES ($1, $2, $3, to_timestamp($4 / 1000.0), $5)`,
-      [order.id, order.retailer, order.status, order.placedAt, order.note || ''],
+      `INSERT INTO orders (id, retailer, user_id, status, placed_at, note)
+       VALUES ($1, $2, $3, $4, to_timestamp($5 / 1000.0), $6)`,
+      [order.id, order.retailer, order.retailer === 'Maison Bleu' ? 'user-maison-bleu' : null,
+        order.status, order.placedAt, order.note || ''],
     );
     for (const item of order.items) {
       await client.query(
@@ -140,19 +183,60 @@ async function seedCatalogue(client) {
   `);
 }
 
+const DEMO_ACCOUNTS = [
+  { id: 'user-maison-bleu', email: 'maison@stockist.test', name: 'Maison Bleu', role: 'retailer', password: () => config.retailerPassword },
+  { id: 'user-verre-group', email: 'verre@stockist.test', name: 'Verre Group', role: 'brand', password: () => config.brandPassword },
+];
+
+async function createBrandFor(client, account) {
+  const brandId = account.id === 'user-verre-group' ? 'brand-verre-group' : 'brand-' + randomId();
+  const position = await client.query('SELECT COALESCE(MAX(position), 0) + 1 AS n FROM brands');
+  await client.query(
+    `INSERT INTO brands (id, name, category, loc, tagline, position)
+     VALUES ($1, $2, 'Home', '', '', $3)
+     ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name`,
+    [brandId, account.name, position.rows[0].n],
+  );
+  await client.query('UPDATE accounts SET brand_id = $2 WHERE id = $1', [account.id, brandId]);
+  return brandId;
+}
+
+async function ensureSellerBrands(client) {
+  const { rows } = await client.query(
+    `SELECT id, name FROM accounts WHERE role = 'brand' AND brand_id IS NULL`,
+  );
+  for (const account of rows) await createBrandFor(client, account);
+}
+
 async function syncAccounts(client) {
-  const accounts = [
-    ['Maison Bleu', 'retailer', config.retailerPassword],
-    ['Verre Group', 'brand', config.brandPassword],
-  ];
-  for (const [name, role, password] of accounts) {
-    const passwordHash = await hashPassword(password);
+  for (const account of DEMO_ACCOUNTS) {
+    const passwordHash = await hashPassword(account.password());
     await client.query(
-      `INSERT INTO accounts (name, role, password_hash) VALUES ($1, $2, $3)
-       ON CONFLICT (name) DO UPDATE SET role = EXCLUDED.role, password_hash = EXCLUDED.password_hash`,
-      [name, role, passwordHash],
+      `INSERT INTO accounts (id, email, name, role, password_hash)
+       VALUES ($1, $2, $3, $4, $5)
+       ON CONFLICT (id) DO UPDATE
+         SET email = EXCLUDED.email, name = EXCLUDED.name, role = EXCLUDED.role, password_hash = EXCLUDED.password_hash`,
+      [account.id, account.email, account.name, account.role, passwordHash],
     );
   }
+}
+
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function randomId() {
+  return randomBytes(8).toString('hex');
+}
+
+function cleanEmail(value) {
+  const email = String(value || '').trim().toLowerCase();
+  if (!EMAIL.test(email) || email.length > 120) throw HttpError(400, 'Enter a valid email.');
+  return email;
+}
+
+function cleanName(value) {
+  const name = String(value || '').trim().replace(/\s+/g, ' ');
+  if (name.length < 1 || name.length > 80) throw HttpError(400, 'Enter the business name.');
+  return name;
 }
 
 async function waitForDatabase() {
@@ -179,6 +263,7 @@ export async function prepareDatabase() {
     await client.query('BEGIN');
     try {
       await seedCatalogue(client);
+      await ensureSellerBrands(client);
       await client.query('COMMIT');
     } catch (err) {
       await client.query('ROLLBACK');
@@ -209,25 +294,76 @@ export const db = {
   async products(category) {
     if (category && !CATEGORIES.has(category)) throw HttpError(400, 'Unknown category.');
     const { rows } = await pool.query(
-      `SELECT * FROM products WHERE ($1::text IS NULL OR cat = $1) ORDER BY position`,
+      `SELECT ${PRODUCT_COLUMNS} FROM products WHERE ($1::text IS NULL OR cat = $1) ORDER BY position`,
       [category || null],
     );
     return rows.map(productOf);
   },
 
   async product(id) {
-    const { rows } = await pool.query('SELECT * FROM products WHERE id = $1', [id]);
+    const { rows } = await pool.query(`SELECT ${PRODUCT_COLUMNS} FROM products WHERE id = $1`, [id]);
     return rows[0] ? productOf(rows[0]) : null;
   },
 
+  async productImage(id) {
+    const { rows } = await pool.query(
+      'SELECT image_type, image_bytes FROM products WHERE id = $1',
+      [id],
+    );
+    if (!rows[0] || !rows[0].image_bytes) return null;
+    return { type: rows[0].image_type, bytes: rows[0].image_bytes };
+  },
+
+  async createProduct(session, body = {}) {
+    if (session.role !== 'brand') throw HttpError(403, 'Only a seller account can add a product.');
+    const name = String(body.name || '').trim().replace(/\s+/g, ' ');
+    if (name.length < 1 || name.length > 120) throw HttpError(400, 'Enter a product name.');
+    if (!CATEGORIES.has(body.cat)) throw HttpError(400, 'Choose a category.');
+    const unit = String(body.unit || '').trim().replace(/\s+/g, ' ');
+    if (unit.length < 1 || unit.length > 40) throw HttpError(400, 'Enter the wholesale unit, such as a case of 12.');
+    const blurb = String(body.blurb || '').trim();
+    if (blurb.length < 1 || blurb.length > 800) throw HttpError(400, 'Enter a short description.');
+    const wp = wholeNumber(body.wp, 'Enter a wholesale price in whole dollars.', 0, 1_000_000);
+    const rrp = wholeNumber(body.rrp, 'Enter a retail price in whole dollars.', 1, 1_000_000);
+    const moq = wholeNumber(body.moq, 'Enter a minimum order of at least 1.', 1, 100_000);
+    const stock = wholeNumber(body.stock, 'Enter how many units are in stock.', 0, 1_000_000);
+    const image = imageOf(body.image);
+
+    return withTransaction(async (client) => {
+      const account = await client.query(
+        'SELECT id, name, brand_id FROM accounts WHERE id = $1 AND role = $2',
+        [session.userId, 'brand'],
+      );
+      if (!account.rowCount) throw HttpError(403, 'Only a seller account can add a product.');
+      const brandId = account.rows[0].brand_id || await createBrandFor(client, account.rows[0]);
+      const owned = await client.query('SELECT count(*)::int AS n FROM products WHERE brand_id = $1', [brandId]);
+      if (owned.rows[0].n === 0) {
+        await client.query('UPDATE brands SET category = $2 WHERE id = $1', [brandId, body.cat]);
+      }
+      const position = await client.query('SELECT COALESCE(MAX(position), 0) + 1 AS n FROM products');
+      const id = 'p' + randomBytes(4).toString('hex');
+      // Bytes live on the row for now. Move to S3 + CloudFront; see REFACTOR-NOTES.md §2.
+      const imageUrl = image ? `/api/products/${id}/image` : null;
+      const { rows } = await client.query(
+        `INSERT INTO products
+           (id, brand_id, name, cat, unit, wp, rrp, moq, stock, tint, marks, blurb, image_url, image_type, image_bytes, position)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+         RETURNING ${PRODUCT_COLUMNS}`,
+        [id, brandId, name, body.cat, unit, wp, rrp, moq, stock,
+          TINTS[body.cat], marksOf(name), blurb, imageUrl, image && image.type, image && image.bytes, position.rows[0].n],
+      );
+      return productOf(rows[0]);
+    });
+  },
+
   async ordersFor(session) {
-    const retailer = session.role === 'brand' ? null : session.account;
+    const userId = session.role === 'brand' ? null : session.userId;
     const { rows } = await pool.query(
       `${ORDER_SQL}
-       WHERE ($1::text IS NULL OR o.retailer = $1)
+       WHERE ($1::text IS NULL OR o.user_id = $1)
        GROUP BY o.id
        ORDER BY o.placed_at DESC`,
-      [retailer],
+      [userId],
     );
     return rows.map(orderOf);
   },
@@ -260,8 +396,8 @@ export const db = {
       const seq = await client.query(`SELECT nextval('order_seq') AS n`);
       const id = 'ORD-' + Number(seq.rows[0].n);
       await client.query(
-        `INSERT INTO orders (id, retailer, status, placed_at, note) VALUES ($1, $2, 'new', now(), $3)`,
-        [id, session.account, noteText],
+        `INSERT INTO orders (id, retailer, user_id, status, placed_at, note) VALUES ($1, $2, $3, 'new', now(), $4)`,
+        [id, session.account, session.userId, noteText],
       );
       for (const [productId, qty] of qtyById) {
         await client.query(
@@ -291,9 +427,9 @@ export const db = {
       `SELECT f.brand_id
        FROM favorites f
        JOIN brands b ON b.id = f.brand_id
-       WHERE f.account = $1
+       WHERE f.user_id = $1
        ORDER BY b.position`,
-      [session.account],
+      [session.userId],
     );
     return rows.map(row => row.brand_id);
   },
@@ -302,23 +438,46 @@ export const db = {
     const brand = await pool.query('SELECT 1 FROM brands WHERE id = $1', [brandId]);
     if (!brand.rowCount) throw HttpError(404, 'Brand not found.');
     await pool.query(
-      `INSERT INTO favorites (account, brand_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-      [session.account, brandId],
+      `INSERT INTO favorites (user_id, brand_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+      [session.userId, brandId],
     );
     return this.favorites(session);
   },
 
   async removeFavorite(session, brandId) {
-    await pool.query('DELETE FROM favorites WHERE account = $1 AND brand_id = $2', [session.account, brandId]);
+    await pool.query('DELETE FROM favorites WHERE user_id = $1 AND brand_id = $2', [session.userId, brandId]);
     return this.favorites(session);
   },
 
-  async accountByRole(role) {
+  async accountByEmail(email) {
     const { rows } = await pool.query(
-      'SELECT name, role, password_hash FROM accounts WHERE role = $1',
-      [role],
+      'SELECT id, email, name, role, password_hash FROM accounts WHERE lower(email) = $1',
+      [cleanEmail(email)],
     );
     return rows[0] || null;
+  },
+
+  async signup({ email, name, role, password }) {
+    if (role !== 'retailer' && role !== 'brand') throw HttpError(400, 'Choose a buyer or seller account.');
+    const cleanPassword = String(password || '');
+    if (cleanPassword.length < 8 || cleanPassword.length > 200) throw HttpError(400, 'Use at least 8 characters.');
+    const id = 'user-' + randomId();
+    const passwordHash = await hashPassword(cleanPassword);
+    const accountName = cleanName(name);
+    const accountEmail = cleanEmail(email);
+    try {
+      await withTransaction(async (client) => {
+        await client.query(
+          `INSERT INTO accounts (id, email, name, role, password_hash) VALUES ($1, $2, $3, $4, $5)`,
+          [id, accountEmail, accountName, role, passwordHash],
+        );
+        if (role === 'brand') await createBrandFor(client, { id, name: accountName });
+      });
+    } catch (err) {
+      if (err.code === '23505') throw HttpError(409, 'An account with that email already exists.');
+      throw err;
+    }
+    return { id, email: accountEmail, name: accountName, role };
   },
 
   async loginAllowed(ip) {
@@ -342,8 +501,11 @@ export const db = {
   async reset() {
     if (!config.allowReset) throw HttpError(404, 'Not found.');
     await withTransaction(async (client) => {
-      await client.query('TRUNCATE favorites, order_items, orders, products, brands');
+      await client.query('UPDATE accounts SET brand_id = NULL');
+      await client.query('TRUNCATE favorites, order_items, orders, products');
+      await client.query('DELETE FROM brands');
       await seedCatalogue(client);
+      await ensureSellerBrands(client);
     });
   },
 };

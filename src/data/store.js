@@ -149,6 +149,13 @@ export const actions = {
     setState(s => ({ orders: s.orders.map(existing => existing.id === id ? order : existing) }));
   },
 
+  async createProduct(input) {
+    const product = await api.createProduct(input);
+    PRODUCTS.push(product);
+    setState(s => ({ ready: s.ready }));
+    return product;
+  },
+
   async toggleFav(brandId) {
     const has = (state.favorites || []).includes(brandId);
     const favorites = has ? await api.removeFavorite(brandId) : await api.addFavorite(brandId);

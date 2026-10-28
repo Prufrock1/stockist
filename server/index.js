@@ -1,12 +1,14 @@
 /* STOCKIST API
-   POST   /api/session                 { role, password }  ·  demo: { role }
+   POST   /api/signup                 { role: retailer|brand, name, email, password }
+   POST   /api/session                { email, password }
    GET    /api/session
    DELETE /api/session
    GET    /api/health
    GET    /api/brands
    GET    /api/products?category=
    GET    /api/products/:id
-   GET    /api/orders                  retailer: own orders · brand: every order
+   POST   /api/products               seller: { name, cat, unit, wp, rrp, moq, stock, blurb, image? }
+   GET    /api/orders                  buyer: own orders · seller: every order
    POST   /api/orders                  { items: [{ id, qty }], note }
    PATCH  /api/orders/:id              { status }
    GET    /api/favorites
@@ -14,7 +16,8 @@
    DELETE /api/favorites/:brandId
    POST   /api/reset                   development only
 
-   Authorization is the signed HttpOnly cookie from POST /api/session.
+   Buyer is role "retailer". Seller is role "brand".
+   Authorization is the signed HttpOnly cookie from signup or sign-in.
 */
 import http from 'node:http';
 import { createReadStream } from 'node:fs';
@@ -94,7 +97,7 @@ function readBody(req) {
     let size = 0;
     req.on('data', chunk => {
       size += chunk.length;
-      if (size > 1_000_000) {
+      if (size > 2_500_000) {
         reject(Object.assign(new Error('Payload too large.'), { status: 413 }));
         req.destroy();
         return;
@@ -114,37 +117,44 @@ function sessionOf(req) {
   return readSession(cookiesOf(req)[COOKIE]);
 }
 
+function publicSession(account) {
+  return { userId: account.id, role: account.role, account: account.name, email: account.email };
+}
+
 async function login(req, res) {
   const body = await readBody(req);
-  const role = body.role === 'brand' ? 'brand' : body.role === 'retailer' ? 'retailer' : '';
-  if (!role) {
-    send(req, res, 400, { error: 'Choose a retailer or brand account.', demoLogin: config.allowDemoLogin });
-    return;
-  }
   const ip = clientIp(req);
-  const demo = config.allowDemoLogin && (body.password === undefined || body.password === null);
-  if (!demo) await db.loginAllowed(ip);
-
-  const account = await db.accountByRole(role);
-  if (!account) {
-    send(req, res, 500, { error: 'Accounts are not configured.' });
-    return;
-  }
-  if (!demo) {
-    const password = typeof body.password === 'string' ? body.password.slice(0, 200) : '';
-    const match = await verifyPassword(password, account.password_hash);
-    if (!match) {
-      await db.recordLoginFailure(ip);
-      send(req, res, 401, { error: 'Incorrect password.', demoLogin: config.allowDemoLogin });
+  await db.loginAllowed(ip);
+  let account = null;
+  try {
+    account = await db.accountByEmail(body.email);
+  } catch (err) {
+    if (err.status) {
+      send(req, res, err.status, { error: err.message });
       return;
     }
-    await db.clearLoginFailures(ip);
+    throw err;
   }
+  const password = typeof body.password === 'string' ? body.password.slice(0, 200) : '';
+  const match = account && await verifyPassword(password, account.password_hash);
+  if (!match) {
+    await db.recordLoginFailure(ip);
+    send(req, res, 401, { error: 'Email or password is incorrect.' });
+    return;
+  }
+  await db.clearLoginFailures(ip);
+  const session = publicSession(account);
+  send(req, res, 200, session, { 'Set-Cookie': sessionCookie(signSession(session)) });
+}
 
-  const session = { role: account.role, account: account.name };
-  send(req, res, 200, { ...session, demoLogin: config.allowDemoLogin }, {
-    'Set-Cookie': sessionCookie(signSession(session)),
-  });
+async function signup(req, res) {
+  const body = await readBody(req);
+  const ip = clientIp(req);
+  await db.loginAllowed(ip);
+  const account = await db.signup(body);
+  await db.clearLoginFailures(ip);
+  const session = publicSession(account);
+  send(req, res, 201, session, { 'Set-Cookie': sessionCookie(signSession(session)) });
 }
 
 async function handle(req, res) {
@@ -174,6 +184,10 @@ async function handle(req, res) {
     return;
   }
 
+  if (req.method === 'POST' && parts[0] === 'api' && parts[1] === 'signup' && parts.length === 2) {
+    return signup(req, res);
+  }
+
   if (parts[0] === 'api' && parts[1] === 'session' && parts.length === 2) {
     if (req.method === 'POST') return login(req, res);
     if (req.method === 'DELETE') {
@@ -183,10 +197,10 @@ async function handle(req, res) {
     if (req.method === 'GET') {
       const session = sessionOf(req);
       if (!session) {
-        send(req, res, 401, { error: 'Sign in required.', demoLogin: config.allowDemoLogin });
+        send(req, res, 401, { error: 'Sign in required.' });
         return;
       }
-      send(req, res, 200, { ...session, demoLogin: config.allowDemoLogin });
+      send(req, res, 200, session);
       return;
     }
   }
@@ -199,12 +213,31 @@ async function handle(req, res) {
 
   const session = sessionOf(req);
   if (!session) {
-    send(req, res, 401, { error: 'Sign in required.', demoLogin: config.allowDemoLogin });
+    send(req, res, 401, { error: 'Sign in required.' });
     return;
   }
 
   if (req.method === 'GET' && parts[1] === 'brands' && parts.length === 2) {
     send(req, res, 200, await db.brands());
+    return;
+  }
+  if (req.method === 'GET' && parts[1] === 'products' && parts.length === 4 && parts[3] === 'image') {
+    const image = await db.productImage(decodeURIComponent(parts[2]));
+    if (!image) {
+      send(req, res, 404, { error: 'Image not found.' });
+      return;
+    }
+    res.writeHead(200, {
+      'Content-Type': image.type,
+      'Content-Length': image.bytes.length,
+      'X-Content-Type-Options': 'nosniff',
+      'Cache-Control': 'private, max-age=86400',
+    });
+    res.end(image.bytes);
+    return;
+  }
+  if (req.method === 'POST' && parts[1] === 'products' && parts.length === 2) {
+    send(req, res, 201, await db.createProduct(session, await readBody(req)));
     return;
   }
   if (req.method === 'GET' && parts[1] === 'products' && parts.length === 2) {

@@ -3,12 +3,14 @@
    Shapes match types.d.ts. Vite proxies /api in development;
    production serves the app and the API from one Node process.
 
-     POST   /api/session           { role, password }
+     POST   /api/signup           { role, name, email, password }
+     POST   /api/session          { email, password }
      GET    /api/session
      DELETE /api/session
      GET    /api/brands
      GET    /api/products?category=
      GET    /api/products/:id
+     POST   /api/products         { name, cat, unit, wp, rrp, moq, stock, blurb, image? }
      GET    /api/orders
      POST   /api/orders            { items: [{ id, qty }], note }
      PATCH  /api/orders/:id        { status }
@@ -17,8 +19,6 @@
      DELETE /api/favorites/:brandId
      POST   /api/reset             development only
    ============================================================ */
-
-export let demoLogin = false;
 
 async function request(path, { method = 'GET', body, allowStatus = [] } = {}) {
   let res;
@@ -33,7 +33,6 @@ async function request(path, { method = 'GET', body, allowStatus = [] } = {}) {
     throw new Error('The catalogue API is not running. Start it with npm run dev.');
   }
   const data = await res.json().catch(() => ({}));
-  if (typeof data.demoLogin === 'boolean') demoLogin = data.demoLogin;
   if (!res.ok && !allowStatus.includes(res.status)) {
     throw new Error(data.error || `Request failed (${res.status}).`);
   }
@@ -45,9 +44,13 @@ export async function currentSession() {
   return status === 401 ? null : data;
 }
 
-export async function login({ role, password }) {
-  const body = password == null ? { role } : { role, password };
-  const { data } = await request('/api/session', { method: 'POST', body });
+export async function login({ email, password }) {
+  const { data } = await request('/api/session', { method: 'POST', body: { email, password } });
+  return data;
+}
+
+export async function signup({ role, name, email, password }) {
+  const { data } = await request('/api/signup', { method: 'POST', body: { role, name, email, password } });
   return data;
 }
 
@@ -65,6 +68,9 @@ export const api = {
   },
   getProduct(id) {
     return request('/api/products/' + encodeURIComponent(id)).then(res => res.data);
+  },
+  createProduct(body) {
+    return request('/api/products', { method: 'POST', body }).then(res => res.data);
   },
   listOrders() {
     return request('/api/orders').then(res => res.data);

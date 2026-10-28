@@ -36,7 +36,7 @@ export function ProductDetail({ id, onBack, onAdded, openBrand }) {
 
         <div className="rt-pdp-info">
           <div className="rt-pdp-brand" onClick={openBrand} style={{ cursor: 'pointer' }}>
-            <Ico name="store" size={13} /> {brand.name} · {brand.loc}
+            <Ico name="store" size={13} /> {brand.name}{brand.loc ? ` · ${brand.loc}` : ''}
           </div>
           <h1>{p.name}</h1>
           <p className="rt-pdp-desc">{p.blurb}</p>

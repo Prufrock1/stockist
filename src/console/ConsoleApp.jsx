@@ -16,7 +16,7 @@ const { useState: useStateC, useEffect: useEffectC, useRef: useRefC } = React;
 
 let toastTimer;
 
-export function ConsoleApp({ onExit }) {
+export function ConsoleApp({ onExit, onSignOut }) {
   const s = useStore();
   const [view, setView] = useStateC('all');
   const [cat, setCat] = useStateC('All');
@@ -74,7 +74,7 @@ export function ConsoleApp({ onExit }) {
   const pickBrand = (bid) => {
     setBrand(bid); const b = brandById(bid);
     const n = PRODUCTS.filter(p => p.b === bid).length;
-    pushMsg(`Show ${b.name}`, `${b.name} (${b.loc}) — ${n} SKUs in their line.`);
+    pushMsg(`Show ${b.name}`, `${b.name}${b.loc ? ` (${b.loc})` : ''} — ${n} SKUs in their line.`);
   };
 
   const submitComposer = (e) => {
@@ -180,6 +180,7 @@ export function ConsoleApp({ onExit }) {
                 <Ico name="x" size={13} /> Clear
               </button>
             )}
+            <button type="button" className="nav-logout" onClick={onSignOut}>Log out</button>
             <button className="c-orderpill" onClick={() => setOrderOpen(true)}>
               <Ico name="bag" size={15} /> Order {cartCount > 0 && <span className="c-op-n">{cartCount}</span>}
             </button>
