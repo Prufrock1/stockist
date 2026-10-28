@@ -16,7 +16,7 @@ const { useState: useStateC, useEffect: useEffectC, useRef: useRefC } = React;
 
 let toastTimer;
 
-export function ConsoleApp({ onExit }) {
+export function ConsoleApp({ onExit, onSignOut }) {
   const s = useStore();
   const [view, setView] = useStateC('all');
   const [cat, setCat] = useStateC('All');
@@ -74,7 +74,7 @@ export function ConsoleApp({ onExit }) {
   const pickBrand = (bid) => {
     setBrand(bid); const b = brandById(bid);
     const n = PRODUCTS.filter(p => p.b === bid).length;
-    pushMsg(`Show ${b.name}`, `${b.name} (${b.loc}) — ${n} SKUs in their line.`);
+    pushMsg(`Show ${b.name}`, `${b.name}${b.loc ? ` (${b.loc})` : ''} — ${n} SKUs in their line.`);
   };
 
   const submitComposer = (e) => {
@@ -99,7 +99,10 @@ export function ConsoleApp({ onExit }) {
   useEffectC(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [msgs]);
 
   // order drawer lines
-  const orderLines = Object.entries(s.cart).map(([id, qty]) => { const p = productById(id); return { p, qty, total: p.wp * qty }; });
+  const orderLines = Object.entries(s.cart).flatMap(([id, qty]) => {
+    const p = productById(id);
+    return p ? [{ p, qty, total: p.wp * qty }] : [];
+  });
   const orderSub = orderLines.reduce((a, l) => a + l.total, 0);
 
   const title = brand ? brandById(brand).name : (cat !== 'All' ? cat : viewDef.label);
@@ -177,6 +180,7 @@ export function ConsoleApp({ onExit }) {
                 <Ico name="x" size={13} /> Clear
               </button>
             )}
+            <button type="button" className="nav-logout" onClick={onSignOut}>Log out</button>
             <button className="c-orderpill" onClick={() => setOrderOpen(true)}>
               <Ico name="bag" size={15} /> Order {cartCount > 0 && <span className="c-op-n">{cartCount}</span>}
             </button>
@@ -241,7 +245,16 @@ export function ConsoleApp({ onExit }) {
               <div className="c-order-foot">
                 <div className="c-order-row"><span>{Object.values(s.cart).reduce((a, n) => a + n, 0)} units</span><span>Net-30</span></div>
                 <div className="c-order-row c-order-total"><span>Total</span><span>{money(orderSub)}</span></div>
-                <button className="c-btn-primary c-block" onClick={() => { const id = actions.placeOrder(); setOrderOpen(false); flash('Order ' + id + ' placed'); }}>
+                <button className="c-btn-primary c-block" onClick={async () => {
+                  try {
+                    const id = await actions.placeOrder();
+                    if (!id) return;
+                    setOrderOpen(false);
+                    flash('Order ' + id + ' placed');
+                  } catch (err) {
+                    flash(err.message);
+                  }
+                }}>
                   <Ico name="check" size={15} /> Place wholesale order
                 </button>
               </div>

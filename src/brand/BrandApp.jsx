@@ -2,18 +2,12 @@ import React from 'react';
 import { CATEGORIES, brandById, money, useStore, actions, STATUS_FLOW, orderLines, orderSubtotal, orderUnits } from '../data/store.js';
 import { Ico, Ph } from '../components/ui.jsx';
 import { HBars, StackedChart, WEEK, CAT_COLORS } from './charts.jsx';
-import { Overview, OrdersView, ProductsView, NAV, HEADERS, timeAgo } from './brand-views.jsx';
-import { Showroom } from '../showroom/Showroom.jsx';
+import { Overview, OrdersView, ProductsView, NewProductPage, NAV, HEADERS, timeAgo } from './brand-views.jsx';
 import './brand.css';
 
 /* ============================================================
    BRAND — insights, retailers, order drawer, app shell
    ============================================================ */
-
-// The signed-in brand. A brand only ever edits its own booth, so this is the
-// single point that decides whose booth the Showroom editor loads.
-// PRODUCTION: comes from the authenticated session, not a constant.
-const SESSION_BRAND_ID = 'b1';   // Maison Verre
 
 const RETAILERS = [
   { name: 'Maison Bleu',     loc: 'Paris, FR',     orders: 24, spend: 38400, since: '2023' },
@@ -92,6 +86,7 @@ function RetailersView() {
 const FLOW_LABELS = { new: 'Received', packing: 'Packing', shipped: 'Shipped' };
 function OrderDrawer({ id, onClose }) {
   const s = useStore();
+  const [statusError, setStatusError] = React.useState(null);
   React.useEffect(() => { document.body.classList.add('modal-open'); return () => document.body.classList.remove('modal-open'); }, []);
   const o = s.orders.find(x => x.id === id);
   if (!o) return null;
@@ -144,10 +139,15 @@ function OrderDrawer({ id, onClose }) {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 13, color: 'var(--ink-2)', marginBottom: 11 }}><span>Freight</span><span style={{ color: 'var(--ink-3)' }}>Billed at dispatch</span></div>
             <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 17, paddingTop: 10, borderTop: '1px solid var(--line)' }}><span>Order total</span><span>{money(subtotal)}</span></div>
           </div>
+          {statusError && <div style={{ color: 'var(--danger)', fontSize: 13, marginTop: 14 }}>{statusError}</div>}
         </div>
         <div className="drawer-f">
           {next ? (
-            <button className="btn btn-pri" style={{ flex: 1, justifyContent: 'center' }} onClick={() => actions.advanceOrder(o.id)}>
+            <button className="btn btn-pri" style={{ flex: 1, justifyContent: 'center' }} onClick={async () => {
+              setStatusError(null);
+              try { await actions.advanceOrder(o.id); }
+              catch (err) { setStatusError(err.message); }
+            }}>
               <Ico name={next === 'shipped' ? 'truck' : 'box'} size={15} />
               {next === 'packing' ? 'Start packing' : 'Mark as shipped'}
             </button>
@@ -164,15 +164,19 @@ function OrderDrawer({ id, onClose }) {
 }
 
 // ---------- Brand app shell ----------
-export function BrandApp() {
+export function BrandApp({ onSignOut }) {
   const s = useStore();
-  const [nav, setNav] = React.useState(() => localStorage.getItem('stockist:bdNav') || 'overview');
+  const [nav, setNav] = React.useState(() => {
+    const saved = localStorage.getItem('stockist:bdNav');
+    return saved && HEADERS[saved] ? saved : 'overview';
+  });
   const [drawer, setDrawer] = React.useState(null);
   React.useEffect(() => { localStorage.setItem('stockist:bdNav', nav); }, [nav]);
   const newCount = s.orders.filter(o => o.status === 'new').length;
   const [title, sub] = HEADERS[nav];
 
   const openOrder = (id) => setDrawer(id);
+  const openNewProduct = () => setNav('new-product');
 
   return (
     <div className="bd role-stage">
@@ -197,10 +201,10 @@ export function BrandApp() {
           ))}
         </nav>
         <div className="bd-sideftr">
-          <div className="bd-avatar">V</div>
+          <div className="bd-avatar">{(s.retailer || 'S').slice(0, 1)}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Verre Group</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-3)' }}>8 brands</div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.retailer}</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-3)' }}>Seller</div>
           </div>
           <Ico name="gear" size={16} style={{ color: 'var(--ink-3)' }} />
         </div>
@@ -214,16 +218,17 @@ export function BrandApp() {
           </div>
           <div className="spacer"></div>
           <div className="pill" style={{ cursor: 'default' }}><Ico name="search" size={14} /><span style={{ color: 'var(--ink-3)' }}>Search</span></div>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={onSignOut}>Log out</button>
           <button className="btn btn-ghost btn-sm"><Ico name="external" size={14} /> Export</button>
-          <button className="btn btn-pri btn-sm"><Ico name="plus" size={14} /> New product</button>
+          <button type="button" className="btn btn-pri btn-sm" onClick={openNewProduct}><Ico name="plus" size={14} /> New product</button>
         </div>
 
         {nav === 'overview' && <Overview openOrder={openOrder} />}
         {nav === 'orders' && <OrdersView openOrder={openOrder} />}
-        {nav === 'products' && <ProductsView />}
+        {nav === 'products' && <ProductsView onNew={openNewProduct} />}
+        {nav === 'new-product' && <NewProductPage onDone={() => setNav('products')} />}
         {nav === 'insights' && <InsightsView />}
         {nav === 'retailers' && <RetailersView />}
-        {nav === 'showroom' && <Showroom mode="edit" initialBrandId={SESSION_BRAND_ID} />}
       </main>
 
       {drawer && <OrderDrawer id={drawer} onClose={() => setDrawer(null)} />}

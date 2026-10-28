@@ -1,6 +1,8 @@
 import React from 'react';
-import { PRODUCTS, CATEGORIES, brandById, money, useStore, orderLines, orderSubtotal, orderUnits } from '../data/store.js';
+import { PRODUCTS, CATEGORIES, brandById, money, useStore, actions, orderLines, orderSubtotal, orderUnits } from '../data/store.js';
 import { Ico, Ph } from '../components/ui.jsx';
+import { ProdImg } from '../components/ProductImage.jsx';
+import { productImage } from '../data/images.js';
 import { Sparkline, StackedChart, HBars, StatusPill, StockMeter, WEEK, CAT_COLORS } from './charts.jsx';
 
 /* ============================================================
@@ -13,7 +15,6 @@ export const NAV = [
     { id: 'overview', label: 'Overview', icon: 'chart' },
     { id: 'orders', label: 'Orders', icon: 'pkg' },
     { id: 'products', label: 'Products', icon: 'tag' },
-    { id: 'showroom', label: 'Showroom', icon: 'store' },
   ]},
   { sec: 'Grow', items: [
     { id: 'insights', label: 'Insights', icon: 'spark' },
@@ -25,9 +26,9 @@ export const HEADERS = {
   overview: ['Overview', 'Your wholesale activity at a glance'],
   orders: ['Orders', 'Incoming orders from retailers'],
   products: ['Products', 'Your catalogue and stock levels'],
+  'new-product': ['New product', 'Add a product to the wholesale floor'],
   insights: ['Insights', 'Sell-through, margin and demand'],
   retailers: ['Retailers', 'Stockists carrying your brands'],
-  showroom: ['Showroom', 'Customize your booth — what retailers see on the trade floor'],
 };
 
 export function FilterBar({ children }) {
@@ -195,7 +196,7 @@ export function OrdersView({ openOrder }) {
 }
 
 // ---------- Products view ----------
-export function ProductsView() {
+export function ProductsView({ onNew }) {
   const [cat, setCat] = React.useState('All');
   const list = PRODUCTS.filter(p => cat === 'All' || p.cat === cat);
   return (
@@ -203,7 +204,7 @@ export function ProductsView() {
       <FilterBar>
         <Pill icon="tag" active={cat === 'All'} onClick={() => setCat('All')} caret={false}>All categories</Pill>
         {CATEGORIES.map(c => <Pill key={c} caret={false} active={cat === c} onClick={() => setCat(c)}>{c}</Pill>)}
-        <button className="btn btn-pri btn-sm" style={{ marginLeft: 'auto' }}><Ico name="plus" size={14} /> New product</button>
+        <button type="button" className="btn btn-pri btn-sm" style={{ marginLeft: 'auto' }} onClick={onNew}><Ico name="plus" size={14} /> New product</button>
       </FilterBar>
       <div className="bd-content">
         <div className="panel">
@@ -213,7 +214,10 @@ export function ProductsView() {
               <tbody>
                 {list.map(p => (
                   <tr key={p.id}>
-                    <td><div className="t-prod"><Ph className="t-thumb" tint={p.tint} marks={p.marks} showMark={false} cap="" /><span className="t-strong">{p.name}</span></div></td>
+                    <td><div className="t-prod">{p.imageUrl
+                      ? <ProdImg className="t-thumb" src={productImage(p)} p={p} />
+                      : <Ph className="t-thumb" tint={p.tint} marks={p.marks} showMark={false} cap="" />}
+                      <span className="t-strong">{p.name}</span></div></td>
                     <td>{brandById(p.b).name}</td>
                     <td><span className="mono-tag" style={{ fontSize: 10, padding: '2px 7px' }}>{p.cat}</span></td>
                     <td style={{ fontSize: 12, color: 'var(--ink-3)' }}>{p.unit}</td>
@@ -230,4 +234,162 @@ export function ProductsView() {
       </div>
     </React.Fragment>
   );
+}
+
+export function NewProductPage({ onDone }) {
+  const [form, setForm] = React.useState({
+    name: 'Yuzu Cordial',
+    cat: CATEGORIES[0],
+    unit: 'case of 12',
+    wp: '30',
+    rrp: '54',
+    moq: '4',
+    stock: '40',
+    blurb: 'A shelf-stable cordial for the back bar. Ships in cases, ready for the wholesale floor.',
+  });
+  const [file, setFile] = React.useState(null);
+  const [preview, setPreview] = React.useState(null);
+  const [error, setError] = React.useState(null);
+  const [pending, setPending] = React.useState(false);
+  const set = (key) => (event) => setForm(current => ({ ...current, [key]: event.target.value }));
+
+  React.useEffect(() => () => { if (preview) URL.revokeObjectURL(preview); }, [preview]);
+
+  const chooseImage = (event) => {
+    const next = event.target.files && event.target.files[0];
+    event.target.value = '';
+    if (!next) return;
+    if (!/^image\/(jpeg|png|webp)$/.test(next.type)) {
+      setError('Use a JPEG, PNG, or WebP image.');
+      return;
+    }
+    setError(null);
+    setFile(next);
+    setPreview(current => {
+      if (current) URL.revokeObjectURL(current);
+      return URL.createObjectURL(next);
+    });
+  };
+
+  const clearImage = () => {
+    setFile(null);
+    setPreview(current => {
+      if (current) URL.revokeObjectURL(current);
+      return null;
+    });
+  };
+
+  const submit = async (event) => {
+    event.preventDefault();
+    setPending(true);
+    setError(null);
+    try {
+      const image = file ? await readProductImage(file) : undefined;
+      await actions.createProduct({
+        name: form.name,
+        cat: form.cat,
+        unit: form.unit,
+        wp: Number(form.wp),
+        rrp: Number(form.rrp),
+        moq: Number(form.moq),
+        stock: Number(form.stock),
+        blurb: form.blurb,
+        image,
+      });
+      onDone();
+    } catch (err) {
+      setError(err.message);
+      setPending(false);
+    }
+  };
+
+  return (
+    <div className="bd-content">
+      <form className="bd-product-form panel" onSubmit={submit}>
+        <div className="bd-upload">
+          <div className="bd-upload-preview">
+            {preview ? <img src={preview} alt="" /> : <span>No photo</span>}
+          </div>
+          <div>
+            <div className="bd-upload-title">Product photo</div>
+            <p className="bd-upload-note">JPEG, PNG, or WebP. Shown on the wholesale floor.</p>
+            <div className="bd-upload-actions">
+              <label className="btn btn-ghost btn-sm">
+                {file ? 'Replace photo' : 'Upload photo'}
+                <input type="file" accept="image/jpeg,image/png,image/webp" onChange={chooseImage} />
+              </label>
+              {file && <button type="button" className="btn btn-ghost btn-sm" onClick={clearImage}>Remove</button>}
+            </div>
+          </div>
+        </div>
+        <div className="bd-form-grid">
+          <label className="span-2">Category
+            <select value={form.cat} onChange={set('cat')}>
+              {CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
+            </select>
+          </label>
+          <label className="span-2">Product name
+            <input value={form.name} onChange={set('name')} required maxLength={120} placeholder="Yuzu cordial" />
+          </label>
+          <label>Wholesale unit
+            <input value={form.unit} onChange={set('unit')} required maxLength={40} placeholder="case of 12" />
+          </label>
+          <label>Minimum order
+            <input value={form.moq} onChange={set('moq')} required inputMode="numeric" min="1" />
+          </label>
+          <label>Wholesale price
+            <input value={form.wp} onChange={set('wp')} required inputMode="numeric" min="0" placeholder="30" />
+          </label>
+          <label>Retail price
+            <input value={form.rrp} onChange={set('rrp')} required inputMode="numeric" min="1" placeholder="54" />
+          </label>
+          <label>Units in stock
+            <input value={form.stock} onChange={set('stock')} required inputMode="numeric" min="0" placeholder="40" />
+          </label>
+          <label className="span-2">Description
+            <textarea value={form.blurb} onChange={set('blurb')} required maxLength={800} rows={4} placeholder="What a buyer needs to know before ordering." />
+          </label>
+        </div>
+        {error && <div className="bd-form-error">{error}</div>}
+        <div className="bd-form-actions">
+          <button type="button" className="btn btn-ghost" onClick={onDone}>Cancel</button>
+          <button type="submit" className="btn btn-pri" disabled={pending}>{pending ? 'Adding…' : 'Add product'}</button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+function readProductImage(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const max = 1400;
+      const scale = Math.min(1, max / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(img.width * scale));
+      canvas.height = Math.max(1, Math.round(img.height * scale));
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(url);
+      canvas.toBlob((blob) => {
+        if (!blob) {
+          reject(new Error('Could not read that image.'));
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = String(reader.result);
+          resolve({ type: 'image/jpeg', data: result.slice(result.indexOf(',') + 1) });
+        };
+        reader.onerror = () => reject(new Error('Could not read that image.'));
+        reader.readAsDataURL(blob);
+      }, 'image/jpeg', 0.85);
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error('Use a JPEG, PNG, or WebP image.'));
+    };
+    img.src = url;
+  });
 }

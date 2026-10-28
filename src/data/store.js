@@ -1,87 +1,63 @@
 /* ============================================================
    STOCKIST — shared client store
-   One source of truth. Retailer orders flow into Brand queue.
-
-   Backend note: this store currently owns ALL state (catalogue,
-   orders, booths) and persists to localStorage. When the backend
-   lands, route the actions below through src/data/api.js and keep
-   only session state (cart, favourites, current view) here.
+   Catalogue and orders come from the API. This store keeps
+   session state (cart) and a mirror of the latest server data.
    ============================================================ */
 import React from 'react';
-import { BRANDS, PRODUCTS, CATEGORIES, seedOrders } from './seed.js';
+import { api, currentSession } from './api.js';
 
-export { BRANDS, PRODUCTS, CATEGORIES };
+export const BRANDS = [];
+export const PRODUCTS = [];
+export const CATEGORIES = ['Food & Drink', 'Apparel', 'Home', 'Beauty', 'Accessories'];
+export const STATUS_FLOW = ['new', 'packing', 'shipped'];
 
-// ---- lookups ----
 export const productById = (id) => PRODUCTS.find(p => p.id === id);
 export const brandById   = (id) => BRANDS.find(b => b.id === id);
 export const money = (n) => '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: (n % 1 ? 2 : 0), maximumFractionDigits: 2 });
 
-// ============ booth (showroom) configuration ============
-// Each brand has a customizable booth. Brands edit it; retailers visit it.
-export const BOOTH_ACCENTS = [
-  'oklch(0.42 0.15 280)', // indigo
-  'oklch(0.40 0.13 25)',  // oxblood
-  'oklch(0.42 0.10 155)', // forest
-  'oklch(0.46 0.10 235)', // steel
-  'oklch(0.45 0.12 330)', // plum
-  'oklch(0.32 0.025 270)',// ink
-];
-export const FLOOR_FINISHES = ['oak', 'concrete', 'travertine', 'charcoal'];
-export const WALL_FINISHES  = ['plaster', 'sand', 'sage', 'ink'];
-export const BOOTH_LAYOUTS  = ['gallery', 'market'];
-export const FINISH_LABELS = {
-  oak: 'Oak', concrete: 'Concrete', travertine: 'Travertine', charcoal: 'Charcoal',
-  plaster: 'Plaster', sand: 'Sand', sage: 'Sage', ink: 'Ink',
-  gallery: 'Gallery', market: 'Market stall',
-};
+const STORE_KEY = 'stockist:v5';
 
-export function defaultBooth(brandId) {
-  const b = brandById(brandId);
-  const idx = BRANDS.findIndex(x => x.id === brandId);
-  const sk = PRODUCTS.filter(p => p.b === brandId);
-  return {
-    accent: BOOTH_ACCENTS[idx % BOOTH_ACCENTS.length],
-    kicker: b.category,
-    tagline: b.tagline,
-    heroId: sk[0] ? sk[0].id : null,
-    plinthIds: sk.slice(0, 3).map(p => p.id),
-    floor: FLOOR_FINISHES[idx % FLOOR_FINISHES.length],
-    wall: 'plaster',
-    layout: 'gallery',
-  };
-}
-
-// ============ store ============
-const STORE_KEY = 'stockist:v4';
-export const STATUS_FLOW = ['new', 'packing', 'shipped'];
-
-function loadState() {
+function loadCart() {
   try {
-    const raw = localStorage.getItem(STORE_KEY);
-    if (raw) return JSON.parse(raw);
-  } catch (e) {}
-  return { cart: {}, orders: seedOrders(), retailer: 'Maison Bleu', booths: {}, favorites: [] };
+    const current = localStorage.getItem(STORE_KEY);
+    if (current) return JSON.parse(current).cart || {};
+    const previous = localStorage.getItem('stockist:v4');
+    if (previous) return JSON.parse(previous).cart || {};
+  } catch { /* ignore corrupt storage */ }
+  return {};
 }
 
-let state = loadState();
+let state = {
+  cart: loadCart(),
+  orders: [],
+  retailer: 'Maison Bleu',
+  favorites: [],
+  ready: false,
+  error: null,
+  sessionRole: null,
+};
 const listeners = new Set();
-function persist() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {} }
+function persist() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify({ cart: state.cart })); } catch { /* private mode */ }
+}
 function emit() { persist(); listeners.forEach(l => l()); }
-function setState(updater) { state = { ...state, ...(typeof updater === 'function' ? updater(state) : updater) }; emit(); }
+function setState(updater) {
+  state = { ...state, ...(typeof updater === 'function' ? updater(state) : updater) };
+  emit();
+}
+
+function replaceAll(list, next) {
+  list.splice(0, list.length, ...next);
+}
 
 export const store = {
   getState: () => state,
   subscribe: (l) => { listeners.add(l); return () => listeners.delete(l); },
 };
 
-// merge a brand's saved booth edits over computed defaults
-export function getBooth(brandId) {
-  const saved = (state.booths && state.booths[brandId]) || {};
-  return { ...defaultBooth(brandId), ...saved };
-}
+let hydrateGen = 0;
+let placing = false;
 
-// ---- actions ----
 export const actions = {
   addToCart(id, qty = 1) {
     setState(s => ({ cart: { ...s.cart, [id]: (s.cart[id] || 0) + qty } }));
@@ -97,55 +73,112 @@ export const actions = {
     setState(s => { const cart = { ...s.cart }; delete cart[id]; return { cart }; });
   },
   clearCart() { setState({ cart: {} }); },
-  placeOrder() {
-    const s = state;
-    const items = Object.entries(s.cart).map(([id, qty]) => ({ id, qty }));
-    if (!items.length) return null;
-    const id = 'ORD-' + (4472 + s.orders.length);
-    const order = { id, retailer: s.retailer, items, status: 'new', placedAt: Date.now(), note: '' };
-    setState(prev => ({ orders: [order, ...prev.orders], cart: {} }));
-    return id;
+
+  async hydrate(sessionHint) {
+    const gen = ++hydrateGen;
+    setState({ error: null });
+    try {
+      const session = sessionHint || await currentSession();
+      if (!session) throw new Error('Sign in required.');
+      const [brands, products, orders, favorites] = await Promise.all([
+        api.listBrands(),
+        api.listProducts(),
+        api.listOrders(),
+        api.listFavorites(),
+      ]);
+      if (gen !== hydrateGen) return false;
+      replaceAll(BRANDS, brands);
+      replaceAll(PRODUCTS, products);
+      setState({
+        orders,
+        favorites,
+        retailer: session.account,
+        ready: true,
+        error: null,
+        sessionRole: session.role,
+      });
+      return true;
+    } catch (err) {
+      if (gen !== hydrateGen) return false;
+      setState({
+        ready: false,
+        error: err.message || 'Could not reach the catalogue.',
+        sessionRole: null,
+      });
+      return false;
+    }
   },
-  advanceOrder(id) {
-    setState(s => ({ orders: s.orders.map(o => {
-      if (o.id !== id) return o;
-      const i = STATUS_FLOW.indexOf(o.status);
-      return { ...o, status: STATUS_FLOW[Math.min(i + 1, STATUS_FLOW.length - 1)] };
-    }) }));
+
+  async placeOrder(note = '') {
+    const items = Object.entries(state.cart).map(([id, qty]) => ({ id, qty }));
+    if (!items.length || placing) return null;
+    placing = true;
+    try {
+      const order = await api.placeOrder({ items, note });
+      try {
+        replaceAll(PRODUCTS, await api.listProducts());
+      } catch { /* order exists; stock refreshes on the next load */ }
+      setState(prev => ({
+        orders: [order, ...prev.orders.filter(existing => existing.id !== order.id)],
+        cart: {},
+      }));
+      return order.id;
+    } finally {
+      placing = false;
+    }
   },
-  setOrderStatus(id, status) {
-    setState(s => ({ orders: s.orders.map(o => o.id === id ? { ...o, status } : o) }));
+
+  async advanceOrder(id) {
+    const prev = state.orders.find(order => order.id === id);
+    if (!prev) return;
+    const index = STATUS_FLOW.indexOf(prev.status);
+    if (index < 0 || index >= STATUS_FLOW.length - 1) return;
+    const status = STATUS_FLOW[index + 1];
+    setState(s => ({ orders: s.orders.map(order => order.id === id ? { ...order, status } : order) }));
+    try {
+      const order = await api.setOrderStatus(id, status);
+      setState(s => ({ orders: s.orders.map(existing => existing.id === id ? order : existing) }));
+    } catch (err) {
+      setState(s => ({ orders: s.orders.map(existing => existing.id === id ? prev : existing) }));
+      throw err;
+    }
   },
-  updateBooth(brandId, patch) {
-    setState(s => ({ booths: { ...s.booths, [brandId]: { ...(s.booths[brandId] || {}), ...patch } } }));
+
+  async setOrderStatus(id, status) {
+    const order = await api.setOrderStatus(id, status);
+    setState(s => ({ orders: s.orders.map(existing => existing.id === id ? order : existing) }));
   },
-  resetBooth(brandId) {
-    setState(s => { const b = { ...s.booths }; delete b[brandId]; return { booths: b }; });
+
+  async createProduct(input) {
+    const product = await api.createProduct(input);
+    PRODUCTS.push(product);
+    setState(s => ({ ready: s.ready }));
+    return product;
   },
-  toggleFav(brandId) {
-    setState(s => {
-      const has = (s.favorites || []).includes(brandId);
-      return { favorites: has ? s.favorites.filter(x => x !== brandId) : [...(s.favorites || []), brandId] };
-    });
+
+  async toggleFav(brandId) {
+    const has = (state.favorites || []).includes(brandId);
+    const favorites = has ? await api.removeFavorite(brandId) : await api.addFavorite(brandId);
+    setState({ favorites });
   },
-  resetAll() {
-    try { localStorage.removeItem(STORE_KEY); } catch (e) {}
-    state = { cart: {}, orders: seedOrders(), retailer: 'Maison Bleu', booths: {}, favorites: [] };
-    emit();
+
+  async resetAll() {
+    await api.reset();
+    setState({ cart: {} });
+    await actions.hydrate();
   },
 };
 
-// ---- order math helpers ----
 export function orderLines(order) {
-  return order.items.map(it => {
+  return order.items.flatMap(it => {
     const p = productById(it.id);
-    return { ...it, product: p, lineTotal: p.wp * it.qty };
+    if (!p) return [];
+    return [{ ...it, product: p, lineTotal: p.wp * it.qty }];
   });
 }
 export function orderSubtotal(order) { return orderLines(order).reduce((a, l) => a + l.lineTotal, 0); }
 export function orderUnits(order) { return order.items.reduce((a, it) => a + it.qty, 0); }
 
-// ---- React hook ----
 export function useStore() {
   return React.useSyncExternalStore(store.subscribe, store.getState);
 }

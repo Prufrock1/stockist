@@ -1,0 +1,21 @@
+# Optional local Postgres that matches the RDS connection the API expects.
+# npm run dev does not need this; it starts its own Postgres when DATABASE_URL is unset.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: stockist
+      POSTGRES_PASSWORD: stockist
+      POSTGRES_DB: stockist
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U stockist -d stockist"]
+      interval: 2s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

@@ -36,7 +36,7 @@ export function ProductDetail({ id, onBack, onAdded, openBrand }) {
 
         <div className="rt-pdp-info">
           <div className="rt-pdp-brand" onClick={openBrand} style={{ cursor: 'pointer' }}>
-            <Ico name="store" size={13} /> {brand.name} · {brand.loc}
+            <Ico name="store" size={13} /> {brand.name}{brand.loc ? ` · ${brand.loc}` : ''}
           </div>
           <h1>{p.name}</h1>
           <p className="rt-pdp-desc">{p.blurb}</p>
@@ -76,11 +76,24 @@ export function CartDrawer({ onClose, onPlaced, goCatalog }) {
   const s = useStore();
   React.useEffect(() => { document.body.classList.add('modal-open'); return () => document.body.classList.remove('modal-open'); }, []);
   const entries = Object.entries(s.cart);
-  const lines = entries.map(([id, qty]) => ({ p: productById(id), qty }));
+  const lines = entries.map(([id, qty]) => ({ p: productById(id), qty })).filter(line => line.p);
   const subtotal = lines.reduce((a, l) => a + l.p.wp * l.qty, 0);
   const units = lines.reduce((a, l) => a + l.qty, 0);
 
-  const place = () => { const oid = actions.placeOrder(); if (oid) onPlaced(oid); };
+  const [pending, setPending] = React.useState(false);
+  const [orderError, setOrderError] = React.useState(null);
+  const place = async () => {
+    setOrderError(null);
+    setPending(true);
+    try {
+      const oid = await actions.placeOrder();
+      if (oid) onPlaced(oid);
+    } catch (err) {
+      setOrderError(err.message);
+    } finally {
+      setPending(false);
+    }
+  };
 
   return (
     <React.Fragment>
@@ -127,8 +140,11 @@ export function CartDrawer({ onClose, onPlaced, goCatalog }) {
                 <div className="tr"><span>Freight</span><span style={{ color: 'var(--ink-3)' }}>Billed at dispatch</span></div>
                 <div className="tr grand"><span>Est. total</span><span>{money(subtotal)}</span></div>
               </div>
-              <button className="btn-fill" style={{ width: '100%' }} onClick={place}>
-                Place order <Ico name="arrowR" size={16} />
+              {orderError && (
+                <div style={{ color: 'var(--danger)', fontSize: 13, marginBottom: 12 }}>{orderError}</div>
+              )}
+              <button className="btn-fill" style={{ width: '100%' }} onClick={place} disabled={pending}>
+                {pending ? 'Placing order…' : 'Place order'} {!pending && <Ico name="arrowR" size={16} />}
               </button>
               <div style={{ textAlign: 'center', marginTop: 12, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-3)', letterSpacing: '0.04em' }}>
                 NET-30 TERMS · APPROVED TRADE ACCOUNT

@@ -118,44 +118,14 @@ button { font-family: inherit; cursor: pointer; }
   letter-spacing: -0.02em;
 }
 
-/* ============ App shell / role switcher ============ */
+/* ============ App shell ============ */
 #app { min-height: 100vh; }
 
-.role-switch {
-  position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%);
-  z-index: 800;
-  display: flex; align-items: center; gap: 0;
-  background: oklch(0.18 0.012 60 / 0.92);
-  backdrop-filter: blur(14px) saturate(1.2);
-  border-radius: 999px;
-  padding: 5px;
-  box-shadow: var(--shadow-lg);
-  border: 1px solid oklch(1 0 0 / 0.08);
-  transition: opacity 0.28s ease, transform 0.28s cubic-bezier(0.2,0.7,0.2,1);
+.nav-logout {
+  appearance: none; background: none; border: 0; padding: 4px 0;
+  font: inherit; font-size: 13px; font-weight: 500; color: var(--ink-2); cursor: pointer;
 }
-body.modal-open .role-switch { opacity: 0; pointer-events: none; transform: translateX(-50%) translateY(26px); }
-.role-switch .rs-label {
-  font-family: var(--font-mono); font-size: 9.5px; letter-spacing: 0.14em;
-  text-transform: uppercase; color: oklch(0.85 0.01 80 / 0.55);
-  padding: 0 12px 0 14px;
-}
-.role-switch button {
-  border: none; background: transparent;
-  color: oklch(0.92 0.01 80 / 0.7);
-  font-family: var(--font-ui); font-weight: 600; font-size: 13px;
-  padding: 8px 18px; border-radius: 999px;
-  display: flex; align-items: center; gap: 8px;
-  transition: all 0.22s cubic-bezier(0.2,0.7,0.3,1);
-}
-.role-switch button .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: 0.5; }
-.role-switch button.active {
-  background: var(--paper);
-  color: var(--ink);
-  box-shadow: var(--shadow-sm);
-}
-.role-switch button.active .dot { background: var(--accent); opacity: 1; }
-
-/* fade transition between roles */
+.nav-logout:hover { color: var(--ink); }
 .role-stage { animation: roleIn 0.5s cubic-bezier(0.2,0.7,0.2,1); }
 @keyframes roleIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
 

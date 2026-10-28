@@ -1,42 +1,67 @@
-name: Deploy to GitHub Pages
+name: Deploy
 
+# main is production. This runs after Test succeeds on main, and builds the
+# image that https://stockist.pro serves.
 on:
-  push:
+  workflow_run:
+    workflows: ["Test"]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
   id-token: write
+  contents: read
 
-# Let one deploy finish rather than cancelling it mid-publish.
 concurrency:
-  group: pages
+  group: production
   cancel-in-progress: false
 
 jobs:
-  build:
+  deploy:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: npm
-      - run: npm ci
-      - run: npm run build
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: aws-actions/configure-aws-credentials@v4
         with:
-          path: dist
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+          role-to-assume: arn:aws:iam::487451648436:role/stockistGitHubDeploy
+          aws-region: us-east-1
+      - uses: aws-actions/amazon-ecr-login@v2
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/arm64
+          push: true
+          provenance: false
+          sbom: false
+          tags: 487451648436.dkr.ecr.us-east-1.amazonaws.com/stockist:${{ github.event.workflow_run.head_sha || github.sha }}
+      - name: Update the service
+        env:
+          IMAGE: 487451648436.dkr.ecr.us-east-1.amazonaws.com/stockist:${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          cat > /tmp/container.json <<EOF
+          {
+            "image": "$IMAGE",
+            "containerPort": 8787,
+            "environment": [
+              {"name": "NODE_ENV", "value": "production"},
+              {"name": "PORT", "value": "8787"},
+              {"name": "TRUST_PROXY", "value": "true"}
+            ],
+            "secrets": [
+              {"name": "DATABASE_URL", "valueFrom": "arn:aws:ssm:us-east-1:487451648436:parameter/stockist/database_url"},
+              {"name": "SESSION_SECRET", "valueFrom": "arn:aws:ssm:us-east-1:487451648436:parameter/stockist/session_secret"},
+              {"name": "RETAILER_PASSWORD", "valueFrom": "arn:aws:ssm:us-east-1:487451648436:parameter/stockist/retailer_password"},
+              {"name": "BRAND_PASSWORD", "valueFrom": "arn:aws:ssm:us-east-1:487451648436:parameter/stockist/brand_password"}
+            ]
+          }
+          EOF
+          aws ecs update-express-gateway-service \
+            --service-arn arn:aws:ecs:us-east-1:487451648436:service/default/stockist \
+            --primary-container file:///tmp/container.json \
+            --cpu-architecture ARM64

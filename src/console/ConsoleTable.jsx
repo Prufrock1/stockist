@@ -154,7 +154,7 @@ export function DetailDrawer({ id, onClose, onAdded }) {
           <Ph tint={p.tint} marks={p.marks} cap="product shot" style={{ position: 'absolute', inset: 0 }} />
         </div>
         <div className="c-dr-body">
-          <div className="c-dr-brand"><span className="c-sw" style={{ background: p.tint }} /> {b.name} · {b.loc}</div>
+          <div className="c-dr-brand"><span className="c-sw" style={{ background: p.tint }} /> {b.name}{b.loc ? ` · ${b.loc}` : ''}</div>
           <h2 className="c-dr-name">{p.name}</h2>
           <p className="c-dr-blurb">{p.blurb}</p>
 
