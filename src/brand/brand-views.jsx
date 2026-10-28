@@ -1,5 +1,5 @@
 import React from 'react';
-import { PRODUCTS, CATEGORIES, brandById, money, useStore, actions, orderLines, orderSubtotal, orderUnits } from '../data/store.js';
+import { PRODUCTS, CATEGORIES, money, useStore, actions, orderLines, orderSubtotal, orderUnits } from '../data/store.js';
 import { Ico, Ph } from '../components/ui.jsx';
 import { ProdImg } from '../components/ProductImage.jsx';
 import { productImage } from '../data/images.js';
@@ -210,7 +210,7 @@ export function ProductsView({ onNew }) {
         <div className="panel">
           <div className="table-wrap">
             <table className="dt">
-              <thead><tr><th>Product</th><th>Brand</th><th>Category</th><th>Pack</th><th>Wholesale</th><th>RRP</th><th>Stock</th><th>Status</th></tr></thead>
+              <thead><tr><th>Product</th><th>Category</th><th>Pack</th><th>Wholesale</th><th>RRP</th><th>Stock</th><th>Status</th></tr></thead>
               <tbody>
                 {list.map(p => (
                   <tr key={p.id}>
@@ -218,7 +218,6 @@ export function ProductsView({ onNew }) {
                       ? <ProdImg className="t-thumb" src={productImage(p)} p={p} />
                       : <Ph className="t-thumb" tint={p.tint} marks={p.marks} showMark={false} cap="" />}
                       <span className="t-strong">{p.name}</span></div></td>
-                    <td>{brandById(p.b).name}</td>
                     <td><span className="mono-tag" style={{ fontSize: 10, padding: '2px 7px' }}>{p.cat}</span></td>
                     <td style={{ fontSize: 12, color: 'var(--ink-3)' }}>{p.unit}</td>
                     <td className="t-strong">{money(p.wp)}</td>

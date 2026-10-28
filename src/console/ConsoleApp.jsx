@@ -27,7 +27,7 @@ export function ConsoleApp({ onExit, onSignOut }) {
   const [openId, setOpenId] = useStateC(null);
   const [orderOpen, setOrderOpen] = useStateC(false);
   const [toast, setToast] = useStateC(null);
-  const [msgs, setMsgs] = useStateC([{ role: 'assistant', text: 'Here’s the full catalogue — 24 products across 8 brands. Ask me to filter, or pick a saved view.' }]);
+  const [msgs, setMsgs] = useStateC([{ role: 'assistant', text: 'Here’s the wholesale catalogue. Ask me to filter, or pick a saved view.' }]);
   const [composer, setComposer] = useStateC('');
   const scrollRef = useRefC(null);
 
