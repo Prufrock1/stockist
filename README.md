@@ -68,9 +68,12 @@ Node (`node:http` + `pg`) and Postgres. `types.d.ts` is the response contract.
 Orders and stock updates run in one transaction with a row lock. A buyer
 (role `retailer`) and a seller (role `brand`) each sign up, then sign in with
 email and password. The session is a signed HttpOnly cookie. A buyer sees only
-their orders and is the only one who can place one. A seller sees every order
-and is the only one who can move status along `new → packing → shipped`.
-Saved brands are stored per account.
+their orders and is the only one who can place one. One checkout is one order,
+with one shipment per seller. A seller sees only orders that include their
+shipment, and is the only one who can move that shipment along
+`new → packing → shipped`. The order’s own status follows those shipments:
+shipped when every shipment has shipped, packing when any has moved, otherwise
+new. Saved brands are stored per account.
 
 ```
 POST   /api/signup              { role, name, email, password }
