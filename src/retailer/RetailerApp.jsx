@@ -32,11 +32,12 @@ function ProductCard({ p, layout, onOpen, onQuickAdd }) {
   const low = p.stock < 20;
   if (layout === 'index') {
     const mg = Math.round((1 - p.wp / p.rrp) * 100);
+    const shots = [...new Set(productImages(p))];
     return (
       <div className="card feed" onClick={onOpen}>
-        <div className="fc-media">
-          {productImages(p).map((src, i) => (
-            <div className="fc-shot" key={i}><ProdImg src={src} p={p} className="pi-img" /></div>
+        <div className={'fc-media' + (shots.length === 1 ? ' solo' : '')}>
+          {shots.map((src) => (
+            <div className="fc-shot" key={src}><ProdImg src={src} p={p} className="pi-img" /></div>
           ))}
         </div>
         <div className="fc-body">

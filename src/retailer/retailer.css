@@ -71,7 +71,9 @@
 
 /* media: three different shots of the product */
 .fc-media { flex: 2; position: relative; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.fc-media.solo { grid-template-columns: 1fr; }
 .fc-shot { position: relative; overflow: hidden; border-radius: var(--r-sm); aspect-ratio: 3/4; background: var(--paper-2); }
+.fc-media.solo .fc-shot { aspect-ratio: 7 / 3; }
 .pi-img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.5s cubic-bezier(0.2,0.7,0.2,1); }
 .fc-shot:hover .pi-img { transform: scale(1.04); }
 
