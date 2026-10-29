@@ -28,11 +28,15 @@ Keep only the object key on the product.
 - **Tweaks panel** — already behind `?dev`, but it ships in the main bundle. Move behind an
   env flag if that matters.
 
-## 4. Routing is in-memory
+## 4. Routing
 
-`view` in `RetailerApp` / `nav` in `BrandApp` are React state, so nothing is deep-linkable and
-the back button does not work. Introduce React Router before real users arrive. This also means
-the deployed site needs no SPA rewrite rule today — it will once a router lands.
+Buyer and seller screens are paths in one app. `/` is the shop, then `/products/:id`,
+`/console`, `/orders`, and `/orders/:id`. The seller studio is `/studio` and its children
+(`orders`, `orders/:id`, `products`, `products/new`, `insights`, `retailers`). Sign-in is
+`/signin`, with `/signup/buyer` and `/signup/seller`. A refresh stays on the page. The cart
+drawer is not a path. Production already serves `index.html` for a path that is not a file,
+so `/api` stays the only prefix the server treats specially. Vite `base` is `/` so a refresh
+of a nested path still loads the built assets from the domain root.
 
 ## 5. Smaller items
 
@@ -43,5 +47,4 @@ the deployed site needs no SPA rewrite rule today — it will once a router land
 
 The showroom, booth editor, trade floor, first-person Floor (three.js) and Pavilion were
 removed from `main`'s line of work. Recover them from branch `archive/3d-showroom` or tag
-`archive-3d-showroom`. Users with an old `stockist:bdNav = 'showroom'` in localStorage fall
-back to Overview.
+`archive-3d-showroom`. The studio no longer reads `stockist:bdNav`; the path decides the screen.

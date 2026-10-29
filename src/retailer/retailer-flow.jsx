@@ -19,9 +19,17 @@ function trackIndex(status) {
 // ---------- Product detail ----------
 export function ProductDetail({ id, onBack, onAdded, openBrand }) {
   const p = productById(id);
-  const brand = brandById(p.b);
-  const [qty, setQty] = React.useState(p.moq);
+  const [qty, setQty] = React.useState(p ? p.moq : 1);
   const [shot, setShot] = React.useState(0);
+  if (!p) {
+    return (
+      <div className="rt-pdp role-stage" style={{ padding: '48px 24px' }}>
+        <h1 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, letterSpacing: '-0.03em' }}>Product not on the floor</h1>
+        <button className="btn-line" onClick={onBack}>Back to the shop</button>
+      </div>
+    );
+  }
+  const brand = brandById(p.b);
   const margin = Math.round((1 - p.wp / p.rrp) * 100);
 
   const commit = () => { actions.addToCart(id, qty); onAdded(); };
@@ -167,7 +175,17 @@ export function CartDrawer({ onClose, onPlaced, goCatalog }) {
 export function Confirm({ orderId, goCatalog, goOrders }) {
   const s = useStore();
   const order = s.orders.find(o => o.id === orderId);
-  if (!order) return null;
+  if (!order) {
+    return (
+      <div className="rt-confirm role-stage">
+        <h1>Order not found</h1>
+        <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
+          <button className="btn-fill" onClick={goOrders}>View orders</button>
+          <button className="btn-line" onClick={goCatalog}>Continue browsing</button>
+        </div>
+      </div>
+    );
+  }
   const subtotal = orderSubtotal(order);
   return (
     <div className="rt-confirm role-stage">

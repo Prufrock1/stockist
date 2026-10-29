@@ -1,8 +1,10 @@
 import React from 'react';
+import { Link, Outlet, Route, Routes, useLocation, useParams } from 'react-router';
 import { CATEGORIES, brandById, money, useStore, actions, STATUS_FLOW, orderLines, orderSubtotal, orderUnits } from '../data/store.js';
 import { Ico, Ph } from '../components/ui.jsx';
 import { HBars, StackedChart, WEEK, CAT_COLORS } from './charts.jsx';
 import { Overview, OrdersView, ProductsView, NewProductPage, NAV, HEADERS, timeAgo } from './brand-views.jsx';
+import { KeepSearch, useGo } from '../route.jsx';
 import './brand.css';
 
 /* ============================================================
@@ -164,19 +166,55 @@ function OrderDrawer({ id, onClose }) {
 }
 
 // ---------- Brand app shell ----------
-export function BrandApp({ onSignOut }) {
-  const s = useStore();
-  const [nav, setNav] = React.useState(() => {
-    const saved = localStorage.getItem('stockist:bdNav');
-    return saved && HEADERS[saved] ? saved : 'overview';
-  });
-  const [drawer, setDrawer] = React.useState(null);
-  React.useEffect(() => { localStorage.setItem('stockist:bdNav', nav); }, [nav]);
-  const newCount = s.orders.filter(o => o.status === 'new').length;
-  const [title, sub] = HEADERS[nav];
+const STUDIO = {
+  overview: '/studio',
+  orders: '/studio/orders',
+  products: '/studio/products',
+  insights: '/studio/insights',
+  retailers: '/studio/retailers',
+};
 
-  const openOrder = (id) => setDrawer(id);
-  const openNewProduct = () => setNav('new-product');
+function sectionOf(pathname) {
+  if (pathname.startsWith('/studio/products/new')) return 'new-product';
+  if (pathname.startsWith('/studio/products')) return 'products';
+  if (pathname.startsWith('/studio/orders')) return 'orders';
+  if (pathname.startsWith('/studio/insights')) return 'insights';
+  if (pathname.startsWith('/studio/retailers')) return 'retailers';
+  return 'overview';
+}
+
+function OverviewRoute() {
+  const go = useGo();
+  return <Overview openOrder={(id) => go(`/studio/orders/${id}`)} />;
+}
+
+function OrdersRoute() {
+  const { id } = useParams();
+  const go = useGo();
+  return (
+    <React.Fragment>
+      <OrdersView openOrder={(orderId) => go(`/studio/orders/${orderId}`)} />
+      {id && <OrderDrawer id={id} onClose={() => go('/studio/orders')} />}
+    </React.Fragment>
+  );
+}
+
+function ProductsRoute() {
+  const go = useGo();
+  return <ProductsView onNew={() => go('/studio/products/new')} />;
+}
+
+function NewProductRoute() {
+  const go = useGo();
+  return <NewProductPage onDone={() => go('/studio/products')} />;
+}
+
+function StudioLayout({ onSignOut }) {
+  const s = useStore();
+  const { pathname, search } = useLocation();
+  const section = sectionOf(pathname);
+  const newCount = s.orders.filter(o => o.status === 'new').length;
+  const [title, sub] = HEADERS[section] || HEADERS.overview;
 
   return (
     <div className="bd role-stage">
@@ -192,10 +230,10 @@ export function BrandApp({ onSignOut }) {
             <div key={group.sec}>
               <div className="bd-navsec">{group.sec}</div>
               {group.items.map(it => (
-                <div key={it.id} className={'bd-navitem ' + (nav === it.id ? 'active' : '')} onClick={() => setNav(it.id)}>
+                <Link key={it.id} to={{ pathname: STUDIO[it.id], search }} className={'bd-navitem ' + (section === it.id ? 'active' : '')}>
                   <Ico name={it.icon} size={16} />{it.label}
                   {it.id === 'orders' && newCount > 0 && <span className="badge">{newCount}</span>}
-                </div>
+                </Link>
               ))}
             </div>
           ))}
@@ -220,18 +258,28 @@ export function BrandApp({ onSignOut }) {
           <div className="pill" style={{ cursor: 'default' }}><Ico name="search" size={14} /><span style={{ color: 'var(--ink-3)' }}>Search</span></div>
           <button type="button" className="btn btn-ghost btn-sm" onClick={onSignOut}>Log out</button>
           <button className="btn btn-ghost btn-sm"><Ico name="external" size={14} /> Export</button>
-          <button type="button" className="btn btn-pri btn-sm" onClick={openNewProduct}><Ico name="plus" size={14} /> New product</button>
+          <Link className="btn btn-pri btn-sm" to={{ pathname: '/studio/products/new', search }}><Ico name="plus" size={14} /> New product</Link>
         </div>
 
-        {nav === 'overview' && <Overview openOrder={openOrder} />}
-        {nav === 'orders' && <OrdersView openOrder={openOrder} />}
-        {nav === 'products' && <ProductsView onNew={openNewProduct} />}
-        {nav === 'new-product' && <NewProductPage onDone={() => setNav('products')} />}
-        {nav === 'insights' && <InsightsView />}
-        {nav === 'retailers' && <RetailersView />}
+        <Outlet />
       </main>
-
-      {drawer && <OrderDrawer id={drawer} onClose={() => setDrawer(null)} />}
     </div>
+  );
+}
+
+export function BrandApp({ onSignOut }) {
+  return (
+    <Routes>
+      <Route path="/studio" element={<StudioLayout onSignOut={onSignOut} />}>
+        <Route index element={<OverviewRoute />} />
+        <Route path="orders" element={<OrdersRoute />} />
+        <Route path="orders/:id" element={<OrdersRoute />} />
+        <Route path="products" element={<ProductsRoute />} />
+        <Route path="products/new" element={<NewProductRoute />} />
+        <Route path="insights" element={<InsightsView />} />
+        <Route path="retailers" element={<RetailersView />} />
+        <Route path="*" element={<KeepSearch to="/studio" />} />
+      </Route>
+    </Routes>
   );
 }

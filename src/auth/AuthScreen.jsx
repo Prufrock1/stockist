@@ -1,7 +1,8 @@
 import React from 'react';
+import { Link, useLocation } from 'react-router';
 import { login, signup } from '../data/api.js';
 
-const { useState } = React;
+const { useState, useEffect } = React;
 
 const fieldStyle = {
   width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: 12,
@@ -32,19 +33,18 @@ function Field({ label, ...props }) {
   );
 }
 
-export function AuthScreen({ onSuccess }) {
-  const [view, setView] = useState('signin');
+export function AuthScreen({ view = 'signin', onSuccess }) {
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState(null);
   const [pending, setPending] = useState(false);
 
-  const reset = (next) => {
-    setView(next);
+  useEffect(() => {
     setError(null);
     setPassword('');
-  };
+  }, [view]);
 
   const submit = async (event) => {
     event.preventDefault();
@@ -63,6 +63,7 @@ export function AuthScreen({ onSuccess }) {
   };
 
   const kind = KINDS[view];
+  const to = (pathname) => ({ pathname, search: location.search });
 
   return (
     <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: 'var(--paper)', padding: 24 }}>
@@ -95,14 +96,14 @@ export function AuthScreen({ onSuccess }) {
 
         {view === 'signin' ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 18 }}>
-            <button type="button" className="btn-line" onClick={() => reset('retailer')}>Create a buyer account</button>
-            <button type="button" className="btn-line" onClick={() => reset('brand')}>Create a seller account</button>
+            <Link className="btn-line" to={to('/signup/buyer')} state={location.state}>Create a buyer account</Link>
+            <Link className="btn-line" to={to('/signup/seller')} state={location.state}>Create a seller account</Link>
           </div>
         ) : (
-          <button type="button" onClick={() => reset('signin')}
-            style={{ marginTop: 16, background: 'none', border: 0, color: 'var(--ink-2)', font: 'inherit', cursor: 'pointer' }}>
+          <Link to={to('/signin')} state={location.state}
+            style={{ marginTop: 16, background: 'none', border: 0, color: 'var(--ink-2)', font: 'inherit', cursor: 'pointer', textDecoration: 'none' }}>
             Already have an account? Sign in
-          </button>
+          </Link>
         )}
 
         {import.meta.env.DEV && view === 'signin' && (
