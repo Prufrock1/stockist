@@ -182,7 +182,21 @@ img.cl-img { object-fit: cover; display: block; }
 .rt-ordercard .oc-meta { font-size: 12.5px; color: var(--ink-3); margin-top: 3px; }
 .rt-ordercard .oc-items { display: flex; gap: 10px; padding-top: 16px; flex-wrap: wrap; }
 .rt-ordercard .oc-thumb { width: 46px; height: 56px; border-radius: var(--r-sm); }
-.rt-track { display: flex; align-items: center; gap: 0; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+.rt-ordercard img.oc-thumb { object-fit: cover; display: block; }
+.rt-track { display: flex; align-items: flex-start; gap: 0; margin-top: 14px; }
+.rt-track .flowstep { display: flex; flex-direction: column; align-items: center; gap: 6px; flex: 1; position: relative; }
+.rt-track .fdot { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--line-2); background: var(--card); display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--ink-3); z-index: 2; }
+.rt-track .flowstep.done .fdot { background: var(--accent); border-color: var(--accent); color: white; }
+.rt-track .flowstep.current .fdot { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.rt-track .fl { font-family: var(--font-mono); font-size: 9px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-3); }
+.rt-track .flowstep.done .fl, .rt-track .flowstep.current .fl { color: var(--ink-2); }
+.rt-track .flowstep::after { content: ''; position: absolute; top: 13px; left: 50%; width: 100%; height: 2px; background: var(--line-2); z-index: 1; }
+.rt-track .flowstep:last-child::after { display: none; }
+.rt-track .flowstep.done::after { background: var(--accent); }
+.oc-ship { padding-top: 16px; }
+.oc-ship + .oc-ship { margin-top: 8px; border-top: 1px solid var(--line); }
+.oc-ship-h { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; font-weight: 600; }
+.oc-ship .oc-items { padding-top: 12px; }
 
 .rt-ftr { border-top: 1px solid var(--line); padding: 30px 40px; }
 .rt-ftrin { max-width: 1280px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap; }

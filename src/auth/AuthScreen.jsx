@@ -108,7 +108,7 @@ export function AuthScreen({ onSuccess }) {
         {import.meta.env.DEV && view === 'signin' && (
           <p style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', marginTop: 18, lineHeight: 1.6 }}>
             Sample buyer: maison@stockist.test / maison<br />
-            Sample seller: verre@stockist.test / verre
+            Sample sellers: verre@stockist.test / verre · nord@stockist.test / nord
           </p>
         )}
       </form>

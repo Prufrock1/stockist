@@ -55,6 +55,7 @@ export const config = {
   brandPassword,
   allowDemoLogin: process.env.ALLOW_DEMO_LOGIN === 'true' && !production,
   allowReset: process.env.ALLOW_RESET === 'true' && !production,
+  localSecondSeller: process.env.LOCAL_SECOND_SELLER === 'true' && !production,
   corsOrigins: (process.env.CORS_ORIGIN || '').split(',').map(origin => origin.trim()).filter(Boolean),
   trustProxy: process.env.TRUST_PROXY ? process.env.TRUST_PROXY === 'true' : production,
   sessionTtlMs: 1000 * 60 * 60 * 24 * 7,

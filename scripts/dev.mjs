@@ -14,6 +14,7 @@ if (!process.env.DATABASE_URL) {
 }
 if (!process.env.SESSION_SECRET) process.env.SESSION_SECRET = 'dev-only-session-secret-change-me';
 if (!process.env.ALLOW_DEMO_LOGIN) process.env.ALLOW_DEMO_LOGIN = 'true';
+process.env.LOCAL_SECOND_SELLER = 'true';
 if (!process.env.ALLOW_RESET) process.env.ALLOW_RESET = 'true';
 if (!process.env.RETAILER_PASSWORD) process.env.RETAILER_PASSWORD = 'maison';
 if (!process.env.BRAND_PASSWORD) process.env.BRAND_PASSWORD = 'verre';

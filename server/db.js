@@ -83,30 +83,50 @@ function productOf(row) {
   return product;
 }
 
-function orderOf(row) {
-  return {
+function orderOf(row, { seller = false } = {}) {
+  const shipments = row.shipments || [];
+  const items = shipments.flatMap(shipment => shipment.items || []);
+  const order = {
     id: row.id,
     retailer: row.retailer,
-    items: row.items || [],
-    status: row.status,
+    items,
     placedAt: Number(row.placed_at_ms),
     note: row.note,
+    shipments,
   };
+  if (seller) {
+    order.status = shipments[0]?.status || 'new';
+    order.shipmentId = shipments[0]?.id || null;
+  }
+  return order;
 }
 
 const PRODUCT_COLUMNS = 'id, brand_id, name, cat, unit, wp, rrp, moq, stock, tint, marks, blurb, image_url, position';
 
-const ORDER_SQL = `
-  SELECT o.id, o.retailer, o.status, o.note,
+function orderSql(brandParam) {
+  const brandFilter = brandParam ? `AND s.brand_id = ${brandParam}` : '';
+  return `
+  SELECT o.id, o.retailer, o.note,
          (EXTRACT(EPOCH FROM o.placed_at) * 1000)::bigint AS placed_at_ms,
-         COALESCE(
-           json_agg(json_build_object('id', i.product_id, 'qty', i.qty) ORDER BY i.product_id)
-             FILTER (WHERE i.product_id IS NOT NULL),
-           '[]'
-         ) AS items
+         COALESCE((
+           SELECT json_agg(json_build_object(
+             'id', s.id,
+             'brandId', s.brand_id,
+             'brandName', b.name,
+             'status', s.status,
+             'items', COALESCE((
+               SELECT json_agg(json_build_object('id', i.product_id, 'qty', i.qty) ORDER BY i.product_id)
+               FROM order_items i
+               WHERE i.shipment_id = s.id
+             ), '[]'::json)
+           ) ORDER BY b.name)
+           FROM shipments s
+           JOIN brands b ON b.id = s.brand_id
+           WHERE s.order_id = o.id ${brandFilter}
+         ), '[]'::json) AS shipments
   FROM orders o
-  LEFT JOIN order_items i ON i.order_id = o.id
 `;
+}
 
 async function withTransaction(fn) {
   const client = await pool.connect();
@@ -144,8 +164,14 @@ const DEMO_ACCOUNTS = [
   { id: 'user-verre-group', email: 'verre@stockist.test', name: 'Verre Group', role: 'brand', password: () => config.brandPassword },
 ];
 
+function stableBrandId(accountId) {
+  if (accountId === 'user-verre-group') return 'brand-verre-group';
+  if (accountId === 'user-atelier-nord') return 'brand-atelier-nord';
+  return null;
+}
+
 async function createBrandFor(client, account) {
-  const brandId = account.id === 'user-verre-group' ? 'brand-verre-group' : 'brand-' + randomId();
+  const brandId = stableBrandId(account.id) || ('brand-' + randomId());
   const position = await client.query('SELECT COALESCE(MAX(position), 0) + 1 AS n FROM brands');
   await client.query(
     `INSERT INTO brands (id, name, category, loc, tagline, position)
@@ -169,6 +195,33 @@ async function ensureSellerBrands(client) {
     `SELECT id, name FROM accounts WHERE role = 'brand' AND brand_id IS NULL`,
   );
   for (const account of rows) await createBrandFor(client, account);
+}
+
+async function ensureLocalSecondSeller(client) {
+  if (!config.localSecondSeller) return;
+  const passwordHash = await hashPassword('nord');
+  await client.query(
+    `INSERT INTO accounts (id, email, name, role, password_hash)
+     VALUES ('user-atelier-nord', 'nord@stockist.test', 'Atelier Nord', 'brand', $1)
+     ON CONFLICT (id) DO UPDATE
+       SET email = EXCLUDED.email, name = EXCLUDED.name, role = EXCLUDED.role, password_hash = EXCLUDED.password_hash`,
+    [passwordHash],
+  );
+}
+
+async function ensureLocalSecondProduct(client) {
+  if (!config.localSecondSeller) return;
+  const existing = await client.query(`SELECT 1 FROM products WHERE id = 'p-nord-candle'`);
+  if (existing.rowCount) return;
+  const position = await client.query('SELECT COALESCE(MAX(position), 0) + 1 AS n FROM products');
+  await client.query(
+    `INSERT INTO products
+       (id, brand_id, name, cat, unit, wp, rrp, moq, stock, tint, marks, blurb, position)
+     VALUES ('p-nord-candle', 'brand-atelier-nord', 'Cedar Candle', 'Home', 'case of 6', 22, 40, 2, 30,
+             'oklch(0.91 0.03 85)', 'CC', 'A soy candle poured for the wholesale counter.', $1)`,
+    [position.rows[0].n],
+  );
+  await client.query(`UPDATE brands SET category = 'Home' WHERE id = 'brand-atelier-nord'`);
 }
 
 async function syncAccounts(client) {
@@ -223,9 +276,11 @@ export async function prepareDatabase() {
     await client.query('SELECT pg_advisory_lock($1)', [582019]);
     await migrate(client);
     await syncAccounts(client);
+    await ensureLocalSecondSeller(client);
     await client.query('BEGIN');
     try {
       await ensureSellerBrands(client);
+      await ensureLocalSecondProduct(client);
       await client.query('COMMIT');
     } catch (err) {
       await client.query('ROLLBACK');
@@ -337,27 +392,19 @@ export const db = {
     if (session.role === 'brand') {
       const ownBrand = await sellerBrandId(session);
       const { rows } = await pool.query(
-        `${ORDER_SQL}
+        `${orderSql('$1')}
          WHERE EXISTS (
-           SELECT 1 FROM order_items mine
-           JOIN products mp ON mp.id = mine.product_id
-           WHERE mine.order_id = o.id AND mp.brand_id = $1
+           SELECT 1 FROM shipments mine
+           WHERE mine.order_id = o.id AND mine.brand_id = $1
          )
-         AND NOT EXISTS (
-           SELECT 1 FROM order_items other
-           JOIN products op ON op.id = other.product_id
-           WHERE other.order_id = o.id AND op.brand_id IS DISTINCT FROM $1
-         )
-         GROUP BY o.id
          ORDER BY o.placed_at DESC`,
         [ownBrand],
       );
-      return rows.map(orderOf);
+      return rows.map(row => orderOf(row, { seller: true }));
     }
     const { rows } = await pool.query(
-      `${ORDER_SQL}
+      `${orderSql()}
        WHERE o.user_id = $1
-       GROUP BY o.id
        ORDER BY o.placed_at DESC`,
       [session.userId],
     );
@@ -376,9 +423,6 @@ export const db = {
         [ids],
       );
       const byId = new Map(locked.rows.map(row => [row.id, row]));
-      if (new Set(locked.rows.map(row => row.brand_id)).size > 1) {
-        throw HttpError(400, 'An order can only include products from one seller.');
-      }
       for (const [id, qty] of qtyById) {
         const product = byId.get(id);
         if (!product) throw HttpError(400, `Unknown product ${id}.`);
@@ -398,13 +442,28 @@ export const db = {
         `INSERT INTO orders (id, retailer, user_id, status, placed_at, note) VALUES ($1, $2, $3, 'new', now(), $4)`,
         [id, session.account, session.userId, noteText],
       );
+      const byBrand = new Map();
       for (const [productId, qty] of qtyById) {
-        await client.query(
-          'INSERT INTO order_items (order_id, product_id, qty) VALUES ($1, $2, $3)',
-          [id, productId, qty],
-        );
+        const brandId = byId.get(productId).brand_id;
+        if (!byBrand.has(brandId)) byBrand.set(brandId, []);
+        byBrand.get(brandId).push([productId, qty]);
       }
-      const { rows } = await client.query(`${ORDER_SQL} WHERE o.id = $1 GROUP BY o.id`, [id]);
+      const brandIds = [...byBrand.keys()].sort();
+      for (let index = 0; index < brandIds.length; index++) {
+        const brandId = brandIds[index];
+        const shipmentId = `${id}-${index + 1}`;
+        await client.query(
+          `INSERT INTO shipments (id, order_id, brand_id, status) VALUES ($1, $2, $3, 'new')`,
+          [shipmentId, id, brandId],
+        );
+        for (const [productId, qty] of byBrand.get(brandId)) {
+          await client.query(
+            'INSERT INTO order_items (order_id, product_id, qty, shipment_id) VALUES ($1, $2, $3, $4)',
+            [id, productId, qty, shipmentId],
+          );
+        }
+      }
+      const { rows } = await client.query(`${orderSql()} WHERE o.id = $1`, [id]);
       return orderOf(rows[0]);
     });
   },
@@ -413,25 +472,30 @@ export const db = {
     if (session.role !== 'brand') throw HttpError(403, 'Only the brand studio can update order status.');
     if (!STATUSES.has(status)) throw HttpError(400, 'Status must be new, packing, or shipped.');
     const ownBrand = await sellerBrandId(session);
-    const { rows } = await pool.query(
-      `UPDATE orders o SET status = $2
-       WHERE o.id = $1
-         AND EXISTS (
-           SELECT 1 FROM order_items mine
-           JOIN products mp ON mp.id = mine.product_id
-           WHERE mine.order_id = o.id AND mp.brand_id = $3
+    return withTransaction(async (client) => {
+      const updated = await client.query(
+        `UPDATE shipments SET status = $2
+         WHERE order_id = $1 AND brand_id = $3
+         RETURNING id`,
+        [id, status, ownBrand],
+      );
+      if (!updated.rowCount) throw HttpError(404, 'Order not found.');
+      await client.query(
+        `UPDATE orders AS o SET status = (
+           SELECT CASE
+             WHEN bool_and(shipment.status = 'shipped') THEN 'shipped'
+             WHEN bool_or(shipment.status <> 'new') THEN 'packing'
+             ELSE 'new'
+           END
+           FROM shipments AS shipment
+           WHERE shipment.order_id = o.id
          )
-         AND NOT EXISTS (
-           SELECT 1 FROM order_items other
-           JOIN products op ON op.id = other.product_id
-           WHERE other.order_id = o.id AND op.brand_id IS DISTINCT FROM $3
-         )
-       RETURNING o.id`,
-      [id, status, ownBrand],
-    );
-    if (!rows[0]) throw HttpError(404, 'Order not found.');
-    const order = await pool.query(`${ORDER_SQL} WHERE o.id = $1 GROUP BY o.id`, [id]);
-    return orderOf(order.rows[0]);
+         WHERE o.id = $1`,
+        [id],
+      );
+      const order = await client.query(`${orderSql('$2')} WHERE o.id = $1`, [id, ownBrand]);
+      return orderOf(order.rows[0], { seller: true });
+    });
   },
 
   async favorites(session) {
@@ -514,9 +578,10 @@ export const db = {
     if (!config.allowReset) throw HttpError(404, 'Not found.');
     await withTransaction(async (client) => {
       await client.query('UPDATE accounts SET brand_id = NULL');
-      await client.query('TRUNCATE favorites, order_items, orders, products');
+      await client.query('TRUNCATE favorites, order_items, shipments, orders, products');
       await client.query('DELETE FROM brands');
       await ensureSellerBrands(client);
+      await ensureLocalSecondProduct(client);
     });
   },
 };

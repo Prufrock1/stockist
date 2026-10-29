@@ -1,5 +1,5 @@
 import React from 'react';
-import { productById, brandById, money, useStore, actions, STATUS_FLOW, orderLines, orderSubtotal, orderUnits } from '../data/store.js';
+import { productById, brandById, money, useStore, actions, orderLines, orderSubtotal, orderUnits } from '../data/store.js';
 import { productImage } from '../data/images.js';
 import { ProdImg } from '../components/ProductImage.jsx';
 import { Ico, Ph } from '../components/ui.jsx';
@@ -10,7 +10,11 @@ import { Ico, Ph } from '../components/ui.jsx';
 
 const TRACK = ['Placed', 'Packing', 'Shipped', 'Delivered'];
 
-function trackIndex(status) { return STATUS_FLOW.indexOf(status) + 1; } // 1..3
+function trackIndex(status) {
+  if (status === 'packing') return 1;
+  if (status === 'shipped') return 2;
+  return 0;
+}
 
 // ---------- Product detail ----------
 export function ProductDetail({ id, onBack, onAdded, openBrand }) {
@@ -164,7 +168,6 @@ export function Confirm({ orderId, goCatalog, goOrders }) {
   const s = useStore();
   const order = s.orders.find(o => o.id === orderId);
   if (!order) return null;
-  const lines = orderLines(order);
   const subtotal = orderSubtotal(order);
   return (
     <div className="rt-confirm role-stage">
@@ -177,15 +180,22 @@ export function Confirm({ orderId, goCatalog, goOrders }) {
         <button className="btn-line" onClick={goCatalog}>Continue browsing</button>
       </div>
       <div className="cf-card">
-        {lines.map(l => (
-          <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 0', borderBottom: '1px solid var(--line)' }}>
-            <Ph tint={l.product.tint} marks={l.product.marks} showMark={false} cap="" style={{ width: 40, height: 48, borderRadius: 'var(--r-sm)', flexShrink: 0 }} />
-            <div style={{ flex: 1 }}>
-              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{brandById(l.product.b).name}</div>
-              <div style={{ fontWeight: 600, fontSize: 14 }}>{l.product.name}</div>
+        {(order.shipments || []).map(shipment => (
+          <div key={shipment.id}>
+            <div className="oc-ship-h" style={{ paddingTop: 12 }}>
+              <span>{shipment.brandName}</span>
+              <span className={'status ' + shipment.status}><span className="sd"></span>{shipment.status === 'new' ? 'Confirmed' : shipment.status}</span>
             </div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-2)' }}>{l.qty} × {money(l.product.wp)}</div>
-            <div style={{ fontWeight: 600, width: 80, textAlign: 'right' }}>{money(l.lineTotal)}</div>
+            {orderLines({ items: shipment.items }).map(l => (
+              <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '10px 0', borderBottom: '1px solid var(--line)' }}>
+                <Ph tint={l.product.tint} marks={l.product.marks} showMark={false} cap="" style={{ width: 40, height: 48, borderRadius: 'var(--r-sm)', flexShrink: 0 }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14 }}>{l.product.name}</div>
+                </div>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-2)' }}>{l.qty} × {money(l.product.wp)}</div>
+                <div style={{ fontWeight: 600, width: 80, textAlign: 'right' }}>{money(l.lineTotal)}</div>
+              </div>
+            ))}
           </div>
         ))}
       </div>
@@ -210,7 +220,8 @@ export function RetailerOrders({ goCatalog }) {
       )}
       {orders.map(o => {
         const lines = orderLines(o);
-        const idx = trackIndex(o.status);
+        const shipments = o.shipments || [];
+        const shipped = shipments.filter(shipment => shipment.status === 'shipped').length;
         return (
           <div className="rt-ordercard" key={o.id}>
             <div className="oc-top">
@@ -218,19 +229,31 @@ export function RetailerOrders({ goCatalog }) {
                 <div className="oc-id">{o.id}</div>
                 <div className="oc-meta">{new Date(o.placedAt).toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} · {orderUnits(o)} line items · {money(orderSubtotal(o))}</div>
               </div>
-              <span className={'status ' + o.status}><span className="sd"></span>{o.status === 'new' ? 'Confirmed' : o.status}</span>
+              {shipments.length > 1 && <span className="oc-meta">{shipped} of {shipments.length} shipped</span>}
             </div>
-            <div className="oc-items">
-              {lines.map(l => <Ph key={l.id} className="oc-thumb" tint={l.product.tint} marks={l.product.marks} showMark={false} cap="" />)}
-            </div>
-            <div className="rt-track">
-              {TRACK.map((t, i) => (
-                <div key={t} className={'flowstep ' + (i < idx ? 'done' : i === idx ? 'current' : '')}>
-                  <div className="fdot">{i < idx ? <Ico name="check" size={13} /> : i + 1}</div>
-                  <div className="fl">{t}</div>
+            {shipments.map(shipment => {
+              const idx = trackIndex(shipment.status);
+              const shipmentLines = lines.filter(line => shipment.items.some(item => item.id === line.id));
+              return (
+                <div className="oc-ship" key={shipment.id}>
+                  <div className="oc-ship-h">
+                    <span>{shipment.brandName}</span>
+                    <span className={'status ' + shipment.status}><span className="sd"></span>{shipment.status === 'new' ? 'Confirmed' : shipment.status}</span>
+                  </div>
+                  <div className="oc-items">
+                    {shipmentLines.map(l => <ProdImg key={l.id} className="oc-thumb" src={productImage(l.product)} p={l.product} />)}
+                  </div>
+                  <div className="rt-track">
+                    {TRACK.map((t, i) => (
+                      <div key={t} className={'flowstep ' + (i < idx ? 'done' : i === idx ? 'current' : '')}>
+                        <div className="fdot">{i < idx ? <Ico name="check" size={13} /> : i + 1}</div>
+                        <div className="fl">{t}</div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              ))}
-            </div>
+              );
+            })}
           </div>
         );
       })}

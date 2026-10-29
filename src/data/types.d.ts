@@ -32,11 +32,20 @@ export interface Product {
 
 export interface OrderItem { id: string; qty: number; }   // id = productId
 export type OrderStatus = 'new' | 'packing' | 'shipped';  // STATUS_FLOW, in order
+export interface Shipment {
+  id: string;
+  brandId: string;
+  brandName: string;
+  status: OrderStatus;
+  items: OrderItem[];
+}
 export interface Order {
   id: string;            // 'ORD-4472'
   retailer: string;      // retailer account name
   items: OrderItem[];
-  status: OrderStatus;
+  status?: OrderStatus;  // seller view: this studio's shipment
+  shipmentId?: string;
+  shipments: Shipment[];
   placedAt: number;      // epoch ms
   note: string;
 }

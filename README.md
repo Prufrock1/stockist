@@ -24,12 +24,14 @@ npm test           # API tests against Postgres
 `npm run dev` starts Postgres on port 54329 when `DATABASE_URL` is unset
 (data in `server/data/pg`, gitignored), then the API and the Vite app.
 Vite proxies `/api`. Sign in, or create a buyer or seller account. The sample
-buyer is `maison@stockist.test` / `maison`. The sample seller is
-`verre@stockist.test` / `verre`.
+buyer is `maison@stockist.test` / `maison`. The sample sellers are
+`verre@stockist.test` / `verre` and, locally only, `nord@stockist.test` / `nord`
+(Atelier Nord, with one product so a buyer can order from two sellers).
 
 `?dev` opens the design-tweaks panel. “Reset orders & cart” clears orders
-and products, then recreates each seller’s empty brand. The cart stays in
-`localStorage` under `stockist:v5`.
+and products, then recreates each seller’s brand. Locally it also puts
+Atelier Nord’s Cedar Candle back. The cart stays in `localStorage` under
+`stockist:v5`.
 
 ## Structure
 

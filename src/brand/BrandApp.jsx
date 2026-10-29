@@ -101,7 +101,7 @@ function OrderDrawer({ id, onClose }) {
       <div className="drawer">
         <div className="drawer-h">
           <div style={{ flex: 1 }}>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-3)', marginBottom: 4 }}>{o.id}</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-3)', marginBottom: 4 }}>{o.id}{o.shipmentId ? ` · ${o.shipmentId}` : ''}</div>
             <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 22, letterSpacing: '-0.02em' }}>{o.retailer}</div>
             <div style={{ fontSize: 12.5, color: 'var(--ink-3)', marginTop: 2 }}>Placed {timeAgo(o.placedAt)}</div>
           </div>
@@ -137,7 +137,7 @@ function OrderDrawer({ id, onClose }) {
           <div style={{ marginTop: 18, padding: '16px', background: 'var(--paper-2)', borderRadius: 'var(--r-md)', border: '1px solid var(--line)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 13, color: 'var(--ink-2)', marginBottom: 9 }}><span>Subtotal</span><span>{money(subtotal)}</span></div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 13, color: 'var(--ink-2)', marginBottom: 11 }}><span>Freight</span><span style={{ color: 'var(--ink-3)' }}>Billed at dispatch</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 17, paddingTop: 10, borderTop: '1px solid var(--line)' }}><span>Order total</span><span>{money(subtotal)}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 17, paddingTop: 10, borderTop: '1px solid var(--line)' }}><span>Your shipment</span><span>{money(subtotal)}</span></div>
           </div>
           {statusError && <div style={{ color: 'var(--danger)', fontSize: 13, marginTop: 14 }}>{statusError}</div>}
         </div>
@@ -153,7 +153,7 @@ function OrderDrawer({ id, onClose }) {
             </button>
           ) : (
             <button className="btn btn-ghost" style={{ flex: 1, justifyContent: 'center' }} disabled>
-              <Ico name="check" size={15} /> Order shipped
+              <Ico name="check" size={15} /> Shipment shipped
             </button>
           )}
           <button className="btn btn-ghost" onClick={onClose}>Close</button>

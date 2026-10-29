@@ -8,7 +8,7 @@
    GET    /api/products?category=
    GET    /api/products/:id
    POST   /api/products               seller: { name, cat, unit, wp, rrp, moq, stock, blurb, image? }
-   GET    /api/orders                  buyer: own orders · seller: orders of their products only
+   GET    /api/orders                  buyer: own orders, one shipment per seller · seller: their shipment only
    POST   /api/orders                  { items: [{ id, qty }], note }
    PATCH  /api/orders/:id              { status }
    GET    /api/favorites

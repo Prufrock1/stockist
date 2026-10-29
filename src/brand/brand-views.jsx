@@ -131,7 +131,10 @@ export function OrderTable({ orders, openOrder }) {
           const lines = orderLines(o);
           return (
             <tr key={o.id} style={{ cursor: 'pointer' }} onClick={() => openOrder(o.id)}>
-              <td className="t-mono">{o.id}</td>
+              <td className="t-mono">
+                {o.id}
+                {o.shipmentId && <div style={{ fontSize: 10.5, color: 'var(--ink-3)' }}>{o.shipmentId}</div>}
+              </td>
               <td className="t-strong">{o.retailer}</td>
               <td>{timeAgo(o.placedAt)}</td>
               <td>

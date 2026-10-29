@@ -144,7 +144,7 @@ describe('stockist api', { concurrency: false, timeout: 120_000 }, () => {
     const product = await addProduct({ name: 'Bar Syrup', stock: 20, moq: 4 });
     const placed = await call('POST', '/api/orders', { body: { items: [{ id: product.id, qty: 6 }], note: 'back bar' } });
     assert.equal(placed.status, 201);
-    assert.equal(placed.body.status, 'new');
+    assert.equal(placed.body.shipments[0].status, 'new');
     assert.equal(placed.body.retailer, 'Maison Bleu');
     assert.equal(placed.body.note, 'back bar');
     assert.match(placed.body.id, /^ORD-\d+$/);
@@ -180,13 +180,16 @@ describe('stockist api', { concurrency: false, timeout: 120_000 }, () => {
     assert.equal(foreignOrder.status, 404);
   });
 
-  test('rejects short, oversold, and mixed-seller lines', async () => {
+  test('rejects short and oversold lines', async () => {
     const product = await addProduct({ name: 'Short Pour', moq: 4, stock: 8 });
     const short = await call('POST', '/api/orders', { body: { items: [{ id: product.id, qty: 1 }] } });
     assert.equal(short.status, 400);
     const over = await call('POST', '/api/orders', { body: { items: [{ id: product.id, qty: 9 }] } });
     assert.equal(over.status, 409);
+  });
 
+  test('one buyer order can include more than one seller', async () => {
+    const product = await addProduct({ name: 'Shared Case', moq: 1, stock: 8 });
     const other = await fetch(base + '/api/signup', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -199,8 +202,40 @@ describe('stockist api', { concurrency: false, timeout: 120_000 }, () => {
       body: JSON.stringify({ name: 'Other Oil', cat: 'Beauty', unit: 'each', wp: 10, rrp: 20, moq: 1, stock: 10, blurb: 'Another studio.' }),
     });
     const theirsBody = await theirs.json();
-    const mixed = await call('POST', '/api/orders', { body: { items: [{ id: product.id, qty: 4 }, { id: theirsBody.id, qty: 1 }] } });
-    assert.equal(mixed.status, 400);
+    const mixed = await call('POST', '/api/orders', { body: { items: [{ id: product.id, qty: 1 }, { id: theirsBody.id, qty: 1 }] } });
+    assert.equal(mixed.status, 201);
+    assert.deepEqual(mixed.body.items.map(item => item.id).sort(), [product.id, theirsBody.id].sort());
+
+    const verre = (await call('GET', '/api/orders', { role: 'brand' })).body.find(order => order.id === mixed.body.id);
+    assert.deepEqual(verre.items.map(item => item.id), [product.id]);
+    assert.equal(verre.status, 'new');
+
+    const otherOrders = await fetch(base + '/api/orders', { headers: { cookie: otherCookie } });
+    const second = (await otherOrders.json()).find(order => order.id === mixed.body.id);
+    assert.deepEqual(second.items.map(item => item.id), [theirsBody.id]);
+
+    const packed = await fetch(base + `/api/orders/${mixed.body.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', cookie: otherCookie },
+      body: JSON.stringify({ status: 'packing' }),
+    });
+    assert.equal((await packed.json()).status, 'packing');
+    assert.equal((await call('GET', '/api/orders', { role: 'brand' })).body.find(order => order.id === mixed.body.id).status, 'new');
+    const buyer = (await call('GET', '/api/orders')).body.find(order => order.id === mixed.body.id);
+    assert.equal(buyer.shipments.length, 2);
+    assert.deepEqual(buyer.shipments.map(shipment => shipment.status).sort(), ['new', 'packing']);
+
+    const shipped = await call('PATCH', `/api/orders/${mixed.body.id}`, { role: 'brand', body: { status: 'shipped' } });
+    assert.equal(shipped.body.status, 'shipped');
+    assert.equal(shipped.body.shipments.length, 1);
+    const otherShipped = await fetch(base + `/api/orders/${mixed.body.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', cookie: otherCookie },
+      body: JSON.stringify({ status: 'shipped' }),
+    });
+    assert.equal((await otherShipped.json()).status, 'shipped');
+    const done = (await call('GET', '/api/orders')).body.find(order => order.id === mixed.body.id);
+    assert.deepEqual(done.shipments.map(shipment => shipment.status), ['shipped', 'shipped']);
   });
 
   test('keeps favourites on the signed-in account and clears the catalogue', async () => {
