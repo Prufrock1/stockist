@@ -6,7 +6,8 @@ import './retailer/retailer.css';
 import { actions, useStore } from './data/store.js';
 import { currentSession, logout } from './data/api.js';
 import { AuthScreen } from './auth/AuthScreen.jsx';
-import { destinationFor, isAuth, isStudio } from './route.jsx';
+import { LandingPage } from './landing/LandingPage.jsx';
+import { destinationFor, isAuth, isPublic, isStudio } from './route.jsx';
 import {
   useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakButton,
 } from './dev/tweaks.jsx';
@@ -51,15 +52,20 @@ function ScrollToTop() {
   return null;
 }
 
-function AuthRoutes({ onSuccess }) {
+function PublicRoutes({ onSuccess }) {
   const location = useLocation();
   return (
     <Routes>
+      <Route path="/" element={<LandingPage />} />
       <Route path="/signin" element={<AuthScreen view="signin" onSuccess={onSuccess} />} />
       <Route path="/signup/buyer" element={<AuthScreen view="retailer" onSuccess={onSuccess} />} />
       <Route path="/signup/seller" element={<AuthScreen view="brand" onSuccess={onSuccess} />} />
       <Route path="*" element={
-        <Navigate to={{ pathname: '/signin', search: location.search }} state={{ from: location }} replace />
+        <Navigate
+          to={{ pathname: isPublic(location.pathname) ? '/' : '/signin', search: location.search }}
+          state={isPublic(location.pathname) ? undefined : { from: location }}
+          replace
+        />
       } />
     </Routes>
   );
@@ -69,6 +75,8 @@ function SignedInRoutes({ role, layout, onSignOut }) {
   const location = useLocation();
   const { pathname, search } = location;
 
+  // Auth screens are public; send signed-in users to their shell.
+  // Buyers keep `/` as the shop. Sellers never stay on `/` — studio only.
   if (isAuth(pathname)) {
     return <Navigate to={destinationFor(role, location.state?.from, search)} replace />;
   }
@@ -132,7 +140,7 @@ function Root() {
   const signOut = async () => {
     await logout();
     setGate('auth');
-    navigate({ pathname: '/signin', search: location.search }, { replace: true });
+    navigate({ pathname: '/', search: location.search }, { replace: true });
   };
 
   const signedIn = gate === 'app' && s.sessionRole;
@@ -141,7 +149,7 @@ function Root() {
     <React.Fragment>
       <ScrollToTop />
       {gate === 'auth'
-        ? <AuthRoutes onSuccess={enter} />
+        ? <PublicRoutes onSuccess={enter} />
         : !signedIn
           ? <Boot error={s.error || bootError} onRetry={() => setAttempt(n => n + 1)} />
           : <SignedInRoutes role={s.sessionRole} layout={t.catalogLayout} onSignOut={signOut} />}

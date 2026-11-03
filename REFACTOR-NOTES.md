@@ -30,13 +30,14 @@ Keep only the object key on the product.
 
 ## 4. Routing
 
-Buyer and seller screens are paths in one app. `/` is the shop, then `/products/:id`,
-`/orders`, and `/orders/:id`. `/console` redirects home for 1.0 (module kept under
-`src/console/`). The seller studio is `/studio` and its children
-(`orders`, `orders/:id`, `products`, `products/new`, `insights`, `retailers`). Sign-in is
-`/signin`, with `/signup/buyer` and `/signup/seller`. A refresh stays on the page. The cart
-drawer is not a path. Production already serves `index.html` for a path that is not a file,
-so `/api` stays the only prefix the server treats specially. Vite `base` is `/` so a refresh
+Buyer and seller screens are paths in one app. `/` is the public landing when signed
+out, and the buyer shop when signed in as a retailer. Then `/products/:id`, `/orders`,
+and `/orders/:id`. `/console` redirects home for 1.0 (module kept under `src/console/`).
+The seller studio is `/studio` and its children (`orders`, `orders/:id`, `products`,
+`products/new`, `insights`, `retailers`). Sign-in is `/signin` (optional `?as=buyer|seller`),
+with `/signup/buyer` and `/signup/seller`. A refresh stays on the page. The cart drawer
+is not a path. Production already serves `index.html` for a path that is not a file, so
+`/api` stays the only prefix the server treats specially. Vite `base` is `/` so a refresh
 of a nested path still loads the built assets from the domain root.
 
 ## 5. Smaller items

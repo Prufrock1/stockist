@@ -35,6 +35,7 @@ function Field({ label, ...props }) {
 
 export function AuthScreen({ view = 'signin', onSuccess }) {
   const location = useLocation();
+  const as = new URLSearchParams(location.search).get('as');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -64,18 +65,24 @@ export function AuthScreen({ view = 'signin', onSuccess }) {
 
   const kind = KINDS[view];
   const to = (pathname) => ({ pathname, search: location.search });
+  const signInTitle = as === 'seller' ? 'Sign in as a seller' : as === 'buyer' ? 'Sign in as a buyer' : 'Sign in';
+  const signInLead = as === 'seller'
+    ? 'Open the studio. Incoming wholesale orders land in your queue.'
+    : as === 'buyer'
+      ? 'Open the floor. Place wholesale orders with the brands you stock.'
+      : 'Buyers shop the floor. Sellers run the order queue.';
 
   return (
     <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', background: 'var(--paper)', padding: 24 }}>
       <form onSubmit={submit} style={{ width: 420, maxWidth: '100%' }}>
-        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, letterSpacing: '0.14em', color: 'var(--ink-3)' }}>STOCKIST</div>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, letterSpacing: '0.14em', color: 'var(--ink-3)' }}>
+          <Link to={{ pathname: '/', search: location.search }} style={{ color: 'inherit', textDecoration: 'none' }}>STOCKIST</Link>
+        </div>
         <h1 style={{ fontFamily: 'var(--font-display)', fontWeight: 700, letterSpacing: '-0.03em', fontSize: 36, margin: '10px 0 8px' }}>
-          {view === 'signin' ? 'Sign in' : kind.title}
+          {view === 'signin' ? signInTitle : kind.title}
         </h1>
         <p style={{ color: 'var(--ink-2)', fontSize: 14.5, lineHeight: 1.5, marginTop: 0 }}>
-          {view === 'signin'
-            ? 'Buyers shop the floor. Sellers run the order queue.'
-            : kind.lead}
+          {view === 'signin' ? signInLead : kind.lead}
         </p>
 
         {view !== 'signin' && (
