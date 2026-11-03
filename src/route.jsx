@@ -17,10 +17,17 @@ export function isConsole(pathname) {
   return pathname === '/console' || pathname.startsWith('/console/');
 }
 
-/** Catalogue browse is public; auth screens too. Orders/studio need a session. */
-export function isPublicBrowse(pathname) {
+/** Shop floor paths sellers may open to preview their public presence. */
+export function isMarketplaceBrowse(pathname) {
   return pathname === '/'
     || pathname.startsWith('/products/')
+    || pathname === '/brands'
+    || pathname.startsWith('/brands/');
+}
+
+/** Catalogue browse is public; auth screens too. Orders/studio need a session. */
+export function isPublicBrowse(pathname) {
+  return isMarketplaceBrowse(pathname)
     || isAuth(pathname)
     || isConsole(pathname);
 }
@@ -43,7 +50,7 @@ export function destinationFor(role, from, search) {
   const path = from?.pathname || '';
   const nextSearch = persistSearch(from?.search || search || '');
   const ok = role === 'brand'
-    ? isStudio(path)
+    ? isStudio(path) || isMarketplaceBrowse(path)
     : Boolean(path) && path !== '/' && !isStudio(path) && !isAuth(path) && !isConsole(path);
   if (ok) return { pathname: path, search: nextSearch };
   return { pathname: homeFor(role), search: nextSearch };

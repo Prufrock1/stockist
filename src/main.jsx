@@ -6,7 +6,7 @@ import './retailer/retailer.css';
 import { actions, useStore } from './data/store.js';
 import { currentSession, logout } from './data/api.js';
 import { AuthScreen } from './auth/AuthScreen.jsx';
-import { destinationFor, isAuth, isPublicBrowse, isStudio } from './route.jsx';
+import { destinationFor, isAuth, isMarketplaceBrowse, isPublicBrowse, isStudio } from './route.jsx';
 import {
   useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakButton,
 } from './dev/tweaks.jsx';
@@ -89,6 +89,13 @@ function SignedInRoutes({ role, layout, onSignOut }) {
     return <Navigate to={destinationFor(role, location.state?.from, search)} replace />;
   }
   if (role === 'brand') {
+    if (isMarketplaceBrowse(pathname)) {
+      return (
+        <Suspense fallback={<Boot />}>
+          <RetailerApp key={layout} layout={layout} onSignOut={onSignOut} sellerPreview />
+        </Suspense>
+      );
+    }
     if (!isStudio(pathname)) return <Navigate to={{ pathname: '/studio', search }} replace />;
     return (
       <Suspense fallback={<Boot />}>
