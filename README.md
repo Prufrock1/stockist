@@ -57,7 +57,7 @@ Dockerfile               production image (static app + API, one process)
 ### Destinations
 - **Public:** `/` shop floor · `/products/:id` · `/signin` · `/signup/buyer` · `/signup/seller`
 - **Retailer (signed in):** same shop at `/`, plus order history and cart checkout.
-- **Brand:** `Overview · Orders · Products · Insights · Retailers` under `/studio`.
+- **Brand:** `Overview · Orders · Products · Brand profile · Insights · Retailers` under `/studio`.
 
 Product thumbnails come from `loremflickr.com` with a tonal fallback when offline;
 replace with `Product.imageUrl`. The operator **Console** lives under `src/console/`
@@ -83,6 +83,7 @@ GET    /api/session
 DELETE /api/session
 GET    /api/health
 GET    /api/brands              public catalogue (sellers only see their brand when signed in)
+PATCH  /api/brand               seller: { name, category, loc, tagline, bio }
 GET    /api/products?category=  public catalogue
 GET    /api/products/:id        public
 POST   /api/products           { name, cat, unit, wp, rrp, moq, stock, blurb }

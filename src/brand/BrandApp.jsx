@@ -3,7 +3,7 @@ import { Link, Outlet, Route, Routes, useLocation, useParams } from 'react-route
 import { CATEGORIES, brandById, money, useStore, actions, STATUS_FLOW, orderLines, orderSubtotal, orderUnits } from '../data/store.js';
 import { Ico, Ph } from '../components/ui.jsx';
 import { HBars, StackedChart, WEEK, CAT_COLORS } from './charts.jsx';
-import { Overview, OrdersView, ProductsView, NewProductPage, NAV, HEADERS, timeAgo } from './brand-views.jsx';
+import { Overview, OrdersView, ProductsView, NewProductPage, BrandProfilePage, NAV, HEADERS, timeAgo } from './brand-views.jsx';
 import { KeepSearch, useGo } from '../route.jsx';
 import './brand.css';
 
@@ -170,6 +170,7 @@ const STUDIO = {
   overview: '/studio',
   orders: '/studio/orders',
   products: '/studio/products',
+  settings: '/studio/settings',
   insights: '/studio/insights',
   retailers: '/studio/retailers',
 };
@@ -178,6 +179,7 @@ function sectionOf(pathname) {
   if (pathname.startsWith('/studio/products/new')) return 'new-product';
   if (pathname.startsWith('/studio/products')) return 'products';
   if (pathname.startsWith('/studio/orders')) return 'orders';
+  if (pathname.startsWith('/studio/settings')) return 'settings';
   if (pathname.startsWith('/studio/insights')) return 'insights';
   if (pathname.startsWith('/studio/retailers')) return 'retailers';
   return 'overview';
@@ -238,14 +240,14 @@ function StudioLayout({ onSignOut }) {
             </div>
           ))}
         </nav>
-        <div className="bd-sideftr">
+        <Link className="bd-sideftr" to={{ pathname: '/studio/settings', search }} style={{ textDecoration: 'none', color: 'inherit' }}>
           <div className="bd-avatar">{(s.retailer || 'S').slice(0, 1)}</div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{s.retailer}</div>
-            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-3)' }}>Seller</div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-3)' }}>Seller · Edit profile</div>
           </div>
           <Ico name="gear" size={16} style={{ color: 'var(--ink-3)' }} />
-        </div>
+        </Link>
       </aside>
 
       <main className="bd-main">
@@ -276,6 +278,7 @@ export function BrandApp({ onSignOut }) {
         <Route path="orders/:id" element={<OrdersRoute />} />
         <Route path="products" element={<ProductsRoute />} />
         <Route path="products/new" element={<NewProductRoute />} />
+        <Route path="settings" element={<BrandProfilePage />} />
         <Route path="insights" element={<InsightsView />} />
         <Route path="retailers" element={<RetailersView />} />
         <Route path="*" element={<KeepSearch to="/studio" />} />

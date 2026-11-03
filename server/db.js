@@ -300,16 +300,76 @@ export async function healthy() {
   await pool.query('SELECT 1');
 }
 
+function brandOf(row) {
+  return {
+    id: row.id,
+    name: row.name,
+    category: row.category,
+    loc: row.loc || '',
+    tagline: row.tagline || '',
+    bio: row.bio || '',
+  };
+}
+
 export const db = {
   async brands(session) {
     const ownBrand = await sellerBrandId(session);
     const { rows } = await pool.query(
-      `SELECT id, name, category, loc, tagline FROM brands
+      `SELECT id, name, category, loc, tagline, bio FROM brands
        WHERE ($1::text IS NULL OR id = $1)
        ORDER BY position`,
       [ownBrand],
     );
-    return rows;
+    return rows.map(brandOf);
+  },
+
+  async updateBrandProfile(session, body = {}) {
+    if (!session || session.role !== 'brand') {
+      throw HttpError(403, 'Only a seller account can edit the brand profile.');
+    }
+    const name = String(body.name || '').trim().replace(/\s+/g, ' ');
+    if (name.length < 1 || name.length > 120) throw HttpError(400, 'Enter a brand name.');
+    if (!CATEGORIES.has(body.category)) throw HttpError(400, 'Choose a category.');
+    const loc = String(body.loc || '').trim().replace(/\s+/g, ' ');
+    if (loc.length > 120) throw HttpError(400, 'Location is too long.');
+    const tagline = String(body.tagline || '').trim().replace(/\s+/g, ' ');
+    if (tagline.length > 200) throw HttpError(400, 'Tagline is too long.');
+    const bio = String(body.bio || '').trim();
+    if (bio.length > 2000) throw HttpError(400, 'Bio is too long.');
+
+    return withTransaction(async (client) => {
+      const account = await client.query(
+        'SELECT id, email, brand_id FROM accounts WHERE id = $1 AND role = $2',
+        [session.userId, 'brand'],
+      );
+      if (!account.rowCount) throw HttpError(403, 'Only a seller account can edit the brand profile.');
+      let brandId = account.rows[0].brand_id;
+      if (!brandId) {
+        brandId = await createBrandFor(client, { id: account.rows[0].id, name });
+      }
+      const { rows } = await client.query(
+        `UPDATE brands
+         SET name = $2, category = $3, loc = $4, tagline = $5, bio = $6
+         WHERE id = $1
+         RETURNING id, name, category, loc, tagline, bio`,
+        [brandId, name, body.category, loc, tagline, bio],
+      );
+      if (!rows[0]) throw HttpError(404, 'Brand not found.');
+      await client.query('UPDATE accounts SET name = $2, brand_id = $3 WHERE id = $1', [
+        session.userId,
+        name,
+        brandId,
+      ]);
+      return {
+        brand: brandOf(rows[0]),
+        session: {
+          userId: session.userId,
+          role: 'brand',
+          account: name,
+          email: account.rows[0].email,
+        },
+      };
+    });
   },
 
   async products(session, category) {

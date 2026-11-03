@@ -203,6 +203,18 @@ export const actions = {
     return product;
   },
 
+  async updateBrand(input) {
+    const brand = await api.updateBrand(input);
+    const index = BRANDS.findIndex(row => row.id === brand.id);
+    if (index >= 0) BRANDS[index] = brand;
+    else BRANDS.splice(0, BRANDS.length, brand);
+    setState(s => ({
+      retailer: s.sessionRole === 'brand' ? brand.name : s.retailer,
+      ready: s.ready,
+    }));
+    return brand;
+  },
+
   async toggleFav(brandId) {
     const has = (state.favorites || []).includes(brandId);
     const favorites = has ? await api.removeFavorite(brandId) : await api.addFavorite(brandId);

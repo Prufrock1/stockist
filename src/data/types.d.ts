@@ -12,6 +12,7 @@ export interface Brand {
   category: Category;
   loc: string;           // 'Bordeaux, FR'
   tagline: string;
+  bio?: string;          // longer brand story for directory / bio pages
 }
 
 export interface Product {
