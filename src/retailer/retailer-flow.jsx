@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router';
 import { productById, brandById, money, useStore, actions, orderLines, orderSubtotal, orderUnits } from '../data/store.js';
 import { productImage } from '../data/images.js';
 import { ProdImg } from '../components/ProductImage.jsx';
@@ -86,7 +87,7 @@ export function ProductDetail({ id, onBack, onAdded, openBrand }) {
 }
 
 // ---------- Cart drawer ----------
-export function CartDrawer({ onClose, onPlaced, goCatalog }) {
+export function CartDrawer({ onClose, onPlaced, goCatalog, guest = false }) {
   const s = useStore();
   React.useEffect(() => { document.body.classList.add('modal-open'); return () => document.body.classList.remove('modal-open'); }, []);
   const entries = Object.entries(s.cart);
@@ -97,6 +98,7 @@ export function CartDrawer({ onClose, onPlaced, goCatalog }) {
   const [pending, setPending] = React.useState(false);
   const [orderError, setOrderError] = React.useState(null);
   const place = async () => {
+    if (guest) return;
     setOrderError(null);
     setPending(true);
     try {
@@ -157,11 +159,17 @@ export function CartDrawer({ onClose, onPlaced, goCatalog }) {
               {orderError && (
                 <div style={{ color: 'var(--danger)', fontSize: 13, marginBottom: 12 }}>{orderError}</div>
               )}
-              <button className="btn-fill" style={{ width: '100%' }} onClick={place} disabled={pending}>
-                {pending ? 'Placing order…' : 'Place order'} {!pending && <Ico name="arrowR" size={16} />}
-              </button>
+              {guest ? (
+                <Link className="btn-fill" style={{ width: '100%' }} to="/signin?as=buyer" onClick={onClose}>
+                  Sign in as a buyer to place order <Ico name="arrowR" size={16} />
+                </Link>
+              ) : (
+                <button className="btn-fill" style={{ width: '100%' }} onClick={place} disabled={pending}>
+                  {pending ? 'Placing order…' : 'Place order'} {!pending && <Ico name="arrowR" size={16} />}
+                </button>
+              )}
               <div style={{ textAlign: 'center', marginTop: 12, fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-3)', letterSpacing: '0.04em' }}>
-                NET-30 TERMS · APPROVED TRADE ACCOUNT
+                {guest ? 'TRADE ACCOUNT REQUIRED TO CHECK OUT' : 'APPROVED TRADE ACCOUNT'}
               </div>
             </div>
           </React.Fragment>

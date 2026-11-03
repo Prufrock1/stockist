@@ -74,6 +74,45 @@ export const actions = {
   },
   clearCart() { setState({ cart: {} }); },
 
+  async hydrateGuest() {
+    const gen = ++hydrateGen;
+    setState({ error: null });
+    try {
+      const [brands, products] = await Promise.all([
+        api.listBrands(),
+        api.listProducts(),
+      ]);
+      if (gen !== hydrateGen) return false;
+      replaceAll(BRANDS, brands);
+      replaceAll(PRODUCTS, products);
+      const liveIds = new Set(products.map(product => product.id));
+      setState(prev => {
+        const cart = { ...prev.cart };
+        for (const id of Object.keys(cart)) {
+          if (!liveIds.has(id)) delete cart[id];
+        }
+        return {
+          cart,
+          orders: [],
+          favorites: [],
+          retailer: null,
+          ready: true,
+          error: null,
+          sessionRole: null,
+        };
+      });
+      return true;
+    } catch (err) {
+      if (gen !== hydrateGen) return false;
+      setState({
+        ready: false,
+        error: err.message || 'Could not reach the catalogue.',
+        sessionRole: null,
+      });
+      return false;
+    }
+  },
+
   async hydrate(sessionHint) {
     const gen = ++hydrateGen;
     setState({ error: null });

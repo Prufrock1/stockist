@@ -12,14 +12,22 @@ export function isAuth(pathname) {
   return pathname === '/signin' || pathname.startsWith('/signup');
 }
 
-/** Unauthenticated surfaces (landing + auth). Everything else needs a session. */
-export function isPublic(pathname) {
-  return pathname === '/' || isAuth(pathname);
-}
-
 /** Console is hidden for 1.0; module kept under src/console/. */
 export function isConsole(pathname) {
   return pathname === '/console' || pathname.startsWith('/console/');
+}
+
+/** Catalogue browse is public; auth screens too. Orders/studio need a session. */
+export function isPublicBrowse(pathname) {
+  return pathname === '/'
+    || pathname.startsWith('/products/')
+    || isAuth(pathname)
+    || isConsole(pathname);
+}
+
+/** @deprecated use isPublicBrowse — kept for any leftover imports */
+export function isPublic(pathname) {
+  return isPublicBrowse(pathname);
 }
 
 /** Keep ?dev; drop one-shot auth hints like ?as=buyer. */

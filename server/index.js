@@ -211,12 +211,8 @@ async function handle(req, res) {
     return;
   }
 
+  // Catalogue reads are public so the homepage can feel like a shopable floor.
   const session = sessionOf(req);
-  if (!session) {
-    send(req, res, 401, { error: 'Sign in required.' });
-    return;
-  }
-
   if (req.method === 'GET' && parts[1] === 'brands' && parts.length === 2) {
     send(req, res, 200, await db.brands(session));
     return;
@@ -231,13 +227,9 @@ async function handle(req, res) {
       'Content-Type': image.type,
       'Content-Length': image.bytes.length,
       'X-Content-Type-Options': 'nosniff',
-      'Cache-Control': 'private, max-age=86400',
+      'Cache-Control': session ? 'private, max-age=86400' : 'public, max-age=86400',
     });
     res.end(image.bytes);
-    return;
-  }
-  if (req.method === 'POST' && parts[1] === 'products' && parts.length === 2) {
-    send(req, res, 201, await db.createProduct(session, await readBody(req)));
     return;
   }
   if (req.method === 'GET' && parts[1] === 'products' && parts.length === 2) {
@@ -251,6 +243,16 @@ async function handle(req, res) {
       return;
     }
     send(req, res, 200, product);
+    return;
+  }
+
+  if (!session) {
+    send(req, res, 401, { error: 'Sign in required.' });
+    return;
+  }
+
+  if (req.method === 'POST' && parts[1] === 'products' && parts.length === 2) {
+    send(req, res, 201, await db.createProduct(session, await readBody(req)));
     return;
   }
   if (req.method === 'GET' && parts[1] === 'orders' && parts.length === 2) {

@@ -106,6 +106,10 @@ test.after(async () => {
 describe('stockist api', { concurrency: false, timeout: 120_000 }, () => {
   test('requires a session and ignores forged role headers', async () => {
     assert.equal((await call('GET', '/api/health', { auth: false })).status, 200);
+    const publicBrands = await call('GET', '/api/brands', { auth: false });
+    const publicProducts = await call('GET', '/api/products', { auth: false });
+    assert.equal(publicBrands.status, 200);
+    assert.equal(publicProducts.status, 200);
     const anon = await call('GET', '/api/orders', { auth: false });
     assert.equal(anon.status, 401);
 
@@ -302,7 +306,8 @@ describe('stockist api', { concurrency: false, timeout: 120_000 }, () => {
     const bytes = Buffer.from(await image.arrayBuffer());
     assert.equal(bytes[0], 0x89);
     const anon = await fetch(base + created.body.imageUrl);
-    assert.equal(anon.status, 401);
+    assert.equal(anon.status, 200);
+    assert.equal(anon.headers.get('content-type'), 'image/png');
     const bad = await call('POST', '/api/products', {
       role: 'brand',
       body: {
