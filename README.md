@@ -1,9 +1,9 @@
 # STOCKIST — two-sided wholesale marketplace
 
 Working prototype of a wholesale marketplace. Brands (sellers) run a dashboard of
-orders, products, insights and retailers; retailers (buyers) browse the catalogue,
-use the Console, and place wholesale orders. A retailer's order drops straight into
-the brand's order queue.
+orders, products, insights and retailers; retailers (buyers) browse the catalogue
+and place wholesale orders. A retailer's order drops straight into the brand's
+order queue.
 
 **This codebase is the source of truth.** It was originally ported from a Claude Design
 project; that project is retired and is no longer synced. New screens can be sketched
@@ -48,19 +48,17 @@ Dockerfile               production image (static app + API, one process)
     types.d.ts           data contract (Brand, Product, Order, …)
   retailer/              shopping shell, PDP, cart drawer, confirm, order history
   brand/                 dashboard shell, overview, orders, products, insights, charts
-  console/               "Console" — chat shell + dense sortable buying spreadsheet
+  console/               deferred past 1.0 — chat + buying spreadsheet (kept, not routed)
   dev/tweaks.jsx         dev-only design exploration panel (?dev)
 ```
 
 ### Destinations
-- **Retailer:** `Shop · Console`, plus order history and cart in the nav.
+- **Retailer:** `Shop`, plus order history and cart in the nav.
 - **Brand:** `Overview · Orders · Products · Insights · Retailers`.
 
-The **Console** is a full-viewport shell with its own chrome: saved views (low stock,
-best margin, new this season…), sortable columns, row selection with bulk add-to-order,
-and a detail drawer. Its chat replies are scripted today; it is the starting point for
-the agentic direction. Product thumbnails come from `loremflickr.com` with a tonal
-fallback when offline; replace with `Product.imageUrl`.
+Product thumbnails come from `loremflickr.com` with a tonal fallback when offline;
+replace with `Product.imageUrl`. The operator **Console** lives under `src/console/`
+but is hidden from nav and routes for the 1.0 cut (`/console` redirects home).
 
 ## Backend
 
