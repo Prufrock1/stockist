@@ -35,7 +35,7 @@ public visitors browse the catalogue; signed-in buyers check out from the same U
 Then `/products/:id`, `/orders`, and `/orders/:id` (orders require a buyer session).
 `/console` redirects home for 1.0 (module kept under `src/console/`). The seller studio
 is `/studio` and its children (`orders`, `orders/:id`, `products`, `products/new`,
-`insights`, `retailers`). Sign-in is `/signin` (optional `?as=buyer|seller`), with
+`settings`, `insights`, `retailers`). Sign-in is `/signin` (optional `?as=buyer|seller`), with
 `/signup/buyer` and `/signup/seller`. Catalogue GETs are public; the cart drawer is not
 a path. Production already serves `index.html` for a path that is not a file, so `/api`
 stays the only prefix the server treats specially. Vite `base` is `/` so a refresh of a

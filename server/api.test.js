@@ -288,6 +288,39 @@ describe('stockist api', { concurrency: false, timeout: 120_000 }, () => {
     assert.equal(blank.status, 400);
   });
 
+  test('a seller can update their brand profile', async () => {
+    const denied = await call('PATCH', '/api/brand', {
+      body: { name: 'Nope', category: 'Home', loc: 'Paris', tagline: 'x', bio: 'y' },
+    });
+    assert.equal(denied.status, 403);
+
+    const updated = await call('PATCH', '/api/brand', {
+      role: 'brand',
+      body: {
+        name: 'Verre Atelier',
+        category: 'Food & Drink',
+        loc: 'Bordeaux, FR',
+        tagline: 'Glass for the trade',
+        bio: 'We pour for independent bars and shops.',
+      },
+    });
+    assert.equal(updated.status, 200);
+    assert.equal(updated.body.name, 'Verre Atelier');
+    assert.equal(updated.body.category, 'Food & Drink');
+    assert.equal(updated.body.loc, 'Bordeaux, FR');
+    assert.equal(updated.body.tagline, 'Glass for the trade');
+    assert.equal(updated.body.bio, 'We pour for independent bars and shops.');
+
+    const listed = await call('GET', '/api/brands', { role: 'brand' });
+    assert.equal(listed.body[0].name, 'Verre Atelier');
+    assert.equal(listed.body[0].bio, 'We pour for independent bars and shops.');
+
+    const publicView = await call('GET', '/api/brands', { auth: false });
+    const row = publicView.body.find(brand => brand.id === 'brand-verre-group');
+    assert.equal(row.name, 'Verre Atelier');
+    assert.equal(row.loc, 'Bordeaux, FR');
+  });
+
   test('stores an uploaded product image', async () => {
     const png = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
     const created = await call('POST', '/api/products', {

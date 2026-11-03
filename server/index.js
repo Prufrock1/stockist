@@ -5,6 +5,7 @@
    DELETE /api/session
    GET    /api/health
    GET    /api/brands
+   PATCH  /api/brand                  seller: { name, category, loc, tagline, bio }
    GET    /api/products?category=
    GET    /api/products/:id
    POST   /api/products               seller: { name, cat, unit, wp, rrp, moq, stock, blurb, image? }
@@ -215,6 +216,17 @@ async function handle(req, res) {
   const session = sessionOf(req);
   if (req.method === 'GET' && parts[1] === 'brands' && parts.length === 2) {
     send(req, res, 200, await db.brands(session));
+    return;
+  }
+  if (req.method === 'PATCH' && parts[1] === 'brand' && parts.length === 2) {
+    if (!session) {
+      send(req, res, 401, { error: 'Sign in required.' });
+      return;
+    }
+    const updated = await db.updateBrandProfile(session, await readBody(req));
+    send(req, res, 200, updated.brand, {
+      'Set-Cookie': sessionCookie(signSession(updated.session)),
+    });
     return;
   }
   if (req.method === 'GET' && parts[1] === 'products' && parts.length === 4 && parts[3] === 'image') {

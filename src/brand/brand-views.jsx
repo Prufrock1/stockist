@@ -1,5 +1,5 @@
 import React from 'react';
-import { PRODUCTS, CATEGORIES, money, useStore, actions, orderLines, orderSubtotal, orderUnits } from '../data/store.js';
+import { BRANDS, PRODUCTS, CATEGORIES, money, useStore, actions, orderLines, orderSubtotal, orderUnits } from '../data/store.js';
 import { Ico, Ph } from '../components/ui.jsx';
 import { ProdImg } from '../components/ProductImage.jsx';
 import { productImage } from '../data/images.js';
@@ -15,6 +15,7 @@ export const NAV = [
     { id: 'overview', label: 'Overview', icon: 'chart' },
     { id: 'orders', label: 'Orders', icon: 'pkg' },
     { id: 'products', label: 'Products', icon: 'tag' },
+    { id: 'settings', label: 'Brand profile', icon: 'gear' },
   ]},
   { sec: 'Grow', items: [
     { id: 'insights', label: 'Insights', icon: 'spark' },
@@ -27,6 +28,7 @@ export const HEADERS = {
   orders: ['Orders', 'Incoming orders from retailers'],
   products: ['Products', 'Your catalogue and stock levels'],
   'new-product': ['New product', 'Add a product to the wholesale floor'],
+  settings: ['Brand profile', 'How buyers see you on the floor'],
   insights: ['Insights', 'Sell-through, margin and demand'],
   retailers: ['Retailers', 'Stockists carrying your brands'],
 };
@@ -356,6 +358,95 @@ export function NewProductPage({ onDone }) {
         <div className="bd-form-actions">
           <button type="button" className="btn btn-ghost" onClick={onDone}>Cancel</button>
           <button type="submit" className="btn btn-pri" disabled={pending}>{pending ? 'Adding…' : 'Add product'}</button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
+export function BrandProfilePage() {
+  const brand = BRANDS[0] || null;
+  const [form, setForm] = React.useState(() => ({
+    name: brand?.name || '',
+    category: brand?.category || CATEGORIES[0],
+    loc: brand?.loc || '',
+    tagline: brand?.tagline || '',
+    bio: brand?.bio || '',
+  }));
+  const [error, setError] = React.useState(null);
+  const [saved, setSaved] = React.useState(false);
+  const [pending, setPending] = React.useState(false);
+  const set = (key) => (event) => {
+    setSaved(false);
+    setForm(current => ({ ...current, [key]: event.target.value }));
+  };
+
+  React.useEffect(() => {
+    if (!brand) return;
+    setForm({
+      name: brand.name || '',
+      category: brand.category || CATEGORIES[0],
+      loc: brand.loc || '',
+      tagline: brand.tagline || '',
+      bio: brand.bio || '',
+    });
+  }, [brand?.id, brand?.name, brand?.category, brand?.loc, brand?.tagline, brand?.bio]);
+
+  const submit = async (event) => {
+    event.preventDefault();
+    setPending(true);
+    setError(null);
+    setSaved(false);
+    try {
+      await actions.updateBrand({
+        name: form.name,
+        category: form.category,
+        loc: form.loc,
+        tagline: form.tagline,
+        bio: form.bio,
+      });
+      setSaved(true);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setPending(false);
+    }
+  };
+
+  return (
+    <div className="bd-content">
+      <form className="bd-product-form panel" onSubmit={submit}>
+        <p style={{ margin: '0 0 18px', color: 'var(--ink-3)', fontSize: 13.5, lineHeight: 1.45 }}>
+          This is what buyers see on the wholesale floor. Keep the location and tagline short; use the bio for the longer story.
+        </p>
+        <div className="bd-form-grid">
+          <label className="span-2">Brand name
+            <input value={form.name} onChange={set('name')} required maxLength={120} placeholder="Maison Verre" />
+          </label>
+          <label>Category
+            <select value={form.category} onChange={set('category')}>
+              {CATEGORIES.map(category => <option key={category} value={category}>{category}</option>)}
+            </select>
+          </label>
+          <label>Location
+            <input value={form.loc} onChange={set('loc')} maxLength={120} placeholder="Bordeaux, FR" />
+          </label>
+          <label className="span-2">Tagline
+            <input value={form.tagline} onChange={set('tagline')} maxLength={200} placeholder="Glassware for the back bar" />
+          </label>
+          <label className="span-2">Bio
+            <textarea value={form.bio} onChange={set('bio')} maxLength={2000} rows={6}
+              placeholder="Origin story, makers, and what retailers should know before they order." />
+          </label>
+        </div>
+        {error && <div className="bd-form-error">{error}</div>}
+        {saved && !error && (
+          <div style={{ color: 'var(--ok)', fontSize: 13, marginTop: 14 }}>Profile saved.</div>
+        )}
+        <div className="bd-form-actions">
+          <button type="submit" className="btn btn-pri" disabled={pending}>
+            {pending ? 'Saving…' : 'Save profile'}
+          </button>
         </div>
       </form>
     </div>

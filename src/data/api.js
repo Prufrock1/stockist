@@ -62,6 +62,9 @@ export const api = {
   listBrands() {
     return request('/api/brands').then(res => res.data);
   },
+  updateBrand(body) {
+    return request('/api/brand', { method: 'PATCH', body }).then(res => res.data);
+  },
   listProducts({ category } = {}) {
     const query = category ? `?category=${encodeURIComponent(category)}` : '';
     return request('/api/products' + query).then(res => res.data);
