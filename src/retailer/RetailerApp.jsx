@@ -1,6 +1,7 @@
 /* ============================================================
    RETAILER — luxury shopping shell
    nav · hero · category rail · catalog grid · footer
+   Public guests see the same floor; sign-in for checkout / orders.
    ============================================================ */
 import React from 'react';
 import { Link, Outlet, Route, Routes, useLocation, useOutletContext, useParams } from 'react-router';
@@ -18,6 +19,13 @@ const SORTS = [
   { key: 'price-desc', label: 'Price · high to low' },
   { key: 'margin', label: 'Best margin' },
 ];
+
+function authLink(search, as) {
+  const params = new URLSearchParams(String(search || '').replace(/^\?/, ''));
+  params.set('as', as);
+  const q = params.toString();
+  return { pathname: '/signin', search: q ? `?${q}` : '' };
+}
 
 function ProductCard({ p, layout, onQuickAdd, search }) {
   const brand = brandById(p.b);
@@ -58,7 +66,7 @@ function ProductCard({ p, layout, onQuickAdd, search }) {
   );
 }
 
-function Catalog() {
+function Catalog({ guest }) {
   const { layout, cat, setCat, sortI, setSortI, flash } = useOutletContext();
   const { search } = useLocation();
   const quickAdd = (p) => { actions.addToCart(p.id, p.moq); flash(`${p.name} added · ${p.moq} × ${p.unit}`); };
@@ -75,9 +83,18 @@ function Catalog() {
         <div className="rt-hero-tag"><span className="ln"></span><span className="mono-label">Wholesale · {BRANDS.length} {BRANDS.length === 1 ? 'brand' : 'brands'} · {PRODUCTS.length} {PRODUCTS.length === 1 ? 'product' : 'products'}</span></div>
         <h1>The wholesale floor for <em>independent</em> retail.</h1>
         <div className="rt-hero-lead">
-          <p>Buy directly from the makers you want on your shelves — small-batch food, considered apparel, hand-made homeware. One trade account, one order, net-30 terms.</p>
+          <p>Buy directly from the makers you want on your shelves — small-batch food, considered apparel, hand-made homeware. One trade account, one order.</p>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <button type="button" className="btn-fill" onClick={() => document.querySelector('.rt-catalog').scrollIntoView({ behavior: 'smooth' })}>Browse the catalogue <Ico name="arrowR" size={14} /></button>
+            {guest ? (
+              <React.Fragment>
+                <Link className="btn-fill" to={authLink(search, 'buyer')}>Sign in as a buyer</Link>
+                <Link className="btn-line" to={authLink(search, 'seller')}>Sign in as a seller</Link>
+              </React.Fragment>
+            ) : (
+              <button type="button" className="btn-fill" onClick={() => document.querySelector('.rt-catalog')?.scrollIntoView({ behavior: 'smooth' })}>
+                Browse the catalogue <Ico name="arrowR" size={14} />
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -97,11 +114,17 @@ function Catalog() {
           <span className="mono-label" style={{ fontSize: 12 }}>{cat === 'All' ? 'All products' : cat}</span>
           <span className="cm-count">{list.length} results · layout: {layout === 'index' ? 'feed' : layout}</span>
         </div>
-        <div className={'rt-grid ' + layout}>
-          {list.map(p => (
-            <ProductCard key={p.id} p={p} layout={layout} search={search} onQuickAdd={() => quickAdd(p)} />
-          ))}
-        </div>
+        {list.length === 0 ? (
+          <div style={{ padding: '48px 8px', color: 'var(--ink-3)', fontSize: 14 }}>
+            No products on the floor yet. Sellers add their catalogue from the studio.
+          </div>
+        ) : (
+          <div className={'rt-grid ' + layout}>
+            {list.map(p => (
+              <ProductCard key={p.id} p={p} layout={layout} search={search} onQuickAdd={() => quickAdd(p)} />
+            ))}
+          </div>
+        )}
       </div>
     </React.Fragment>
   );
@@ -130,7 +153,7 @@ function ConfirmRoute() {
   return <Confirm orderId={id} goCatalog={() => go('/')} goOrders={() => go('/orders')} />;
 }
 
-function ShopShell({ layout, onSignOut, cat, setCat, sortI, setSortI, cartOpen, setCartOpen, toast, flash }) {
+function ShopShell({ guest, layout, onSignOut, cat, setCat, sortI, setSortI, cartOpen, setCartOpen, toast, flash }) {
   const s = useStore();
   const { pathname, search } = useLocation();
   const go = useGo();
@@ -147,10 +170,26 @@ function ShopShell({ layout, onSignOut, cat, setCat, sortI, setSortI, cartOpen, 
           </div>
           <Link className="rt-logo" to={{ pathname: '/', search }}>STOCKIST</Link>
           <div className="rt-navright">
-            <span className="rt-trade">{s.retailer}</span>
-            <button type="button" className="nav-logout" onClick={onSignOut}>Log out</button>
-            <Link className="rt-icon" to={{ pathname: '/orders', search }} aria-label="Orders"><Ico name="clip" size={18} /></Link>
-            <span className="rt-icon" onClick={() => setCartOpen(true)}>
+            {guest ? (
+              <React.Fragment>
+                <Link className="nav-logout" to={authLink(search, 'buyer')}>Buyer sign in</Link>
+                <Link className="nav-logout" to={authLink(search, 'seller')}>Seller sign in</Link>
+              </React.Fragment>
+            ) : (
+              <React.Fragment>
+                <span className="rt-trade">{s.retailer}</span>
+                <button type="button" className="nav-logout" onClick={onSignOut}>Log out</button>
+                <Link className="rt-icon" to={{ pathname: '/orders', search }} aria-label="Orders"><Ico name="clip" size={18} /></Link>
+              </React.Fragment>
+            )}
+            <span
+              className="rt-icon"
+              role="button"
+              tabIndex={0}
+              aria-label="Cart"
+              onClick={() => setCartOpen(true)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') setCartOpen(true); }}
+            >
               <Ico name="bag" size={19} />
               {cartCount > 0 && <span className="rt-cartcount">{cartCount}</span>}
             </span>
@@ -158,18 +197,22 @@ function ShopShell({ layout, onSignOut, cat, setCat, sortI, setSortI, cartOpen, 
         </div>
       </div>
 
-      <Outlet context={{ layout, cat, setCat, sortI, setSortI, flash, openCart: () => setCartOpen(true) }} />
+      <Outlet context={{ layout, cat, setCat, sortI, setSortI, flash, openCart: () => setCartOpen(true), guest }} />
 
       <div className="rt-ftr">
         <div className="rt-ftrin">
           <div className="f-logo">STOCKIST</div>
-          <div className="f-mono">WHOLESALE MARKETPLACE · BRANDS ↔ RETAILERS · NET-30</div>
+          <div className="f-mono">WHOLESALE MARKETPLACE · BRANDS ↔ RETAILERS</div>
         </div>
       </div>
 
       {cartOpen && (
-        <CartDrawer onClose={() => setCartOpen(false)} goCatalog={() => go('/')}
-          onPlaced={(oid) => { setCartOpen(false); go(`/orders/${oid}`); }} />
+        <CartDrawer
+          guest={guest}
+          onClose={() => setCartOpen(false)}
+          goCatalog={() => go('/')}
+          onPlaced={(oid) => { setCartOpen(false); go(`/orders/${oid}`); }}
+        />
       )}
 
       {toast && (
@@ -184,24 +227,23 @@ function ShopShell({ layout, onSignOut, cat, setCat, sortI, setSortI, cartOpen, 
   );
 }
 
-export function RetailerApp({ layout, onSignOut }) {
+export function RetailerApp({ layout, onSignOut, guest = false }) {
   const [cat, setCat] = React.useState('All');
   const [sortI, setSortI] = React.useState(0);
   const [cartOpen, setCartOpen] = React.useState(false);
   const [toast, setToast] = React.useState(null);
   const flash = (msg) => { setToast(msg); clearTimeout(window.__rtToast); window.__rtToast = setTimeout(() => setToast(null), 1900); };
-  const shell = { layout, onSignOut, cat, setCat, sortI, setSortI, cartOpen, setCartOpen, toast, flash };
+  const shell = { guest, layout, onSignOut, cat, setCat, sortI, setSortI, cartOpen, setCartOpen, toast, flash };
 
   return (
     <Routes>
-      {/* Console is deferred past 1.0; keep src/console/ and send bookmarks home. */}
       <Route path="/console" element={<KeepSearch to="/" />} />
       <Route path="/console/*" element={<KeepSearch to="/" />} />
       <Route path="/" element={<ShopShell {...shell} />}>
-        <Route index element={<Catalog />} />
+        <Route index element={<Catalog guest={guest} />} />
         <Route path="products/:id" element={<ProductRoute />} />
-        <Route path="orders" element={<OrdersRoute />} />
-        <Route path="orders/:id" element={<ConfirmRoute />} />
+        {!guest && <Route path="orders" element={<OrdersRoute />} />}
+        {!guest && <Route path="orders/:id" element={<ConfirmRoute />} />}
       </Route>
       <Route path="*" element={<KeepSearch to="/" />} />
     </Routes>

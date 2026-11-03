@@ -183,9 +183,9 @@ async function createBrandFor(client, account) {
   return brandId;
 }
 
-/** Null means the caller is a buyer and may see every brand. A seller is limited to their own brand id, or a value that matches nothing when they have no brand yet. */
+/** Null means a public visitor or buyer and may see every brand. A seller is limited to their own brand id, or a value that matches nothing when they have no brand yet. */
 async function sellerBrandId(session) {
-  if (session.role !== 'brand') return null;
+  if (!session || session.role !== 'brand') return null;
   const { rows } = await pool.query('SELECT brand_id FROM accounts WHERE id = $1', [session.userId]);
   return rows[0]?.brand_id || '';
 }

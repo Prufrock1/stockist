@@ -23,7 +23,9 @@ npm test           # API tests against Postgres
 
 `npm run dev` starts Postgres on port 54329 when `DATABASE_URL` is unset
 (data in `server/data/pg`, gitignored), then the API and the Vite app.
-Vite proxies `/api`. Sign in, or create a buyer or seller account. The sample
+Vite proxies `/api`. The homepage is the wholesale shop — browse brands and
+products without signing in. Hero and nav offer **Sign in as a buyer** or
+**Sign in as a seller**; placing an order needs a buyer account. The sample
 buyer is `maison@stockist.test` / `maison`. The sample sellers are
 `verre@stockist.test` / `verre` and, locally only, `nord@stockist.test` / `nord`
 (Atelier Nord, with one product so a buyer can order from two sellers).
@@ -37,7 +39,7 @@ Atelier Nord’s Cedar Candle back. The cart stays in `localStorage` under
 
 ```
 src/
-  main.jsx               entry: Root, sign-in gate, tweaks mount
+  main.jsx               entry: public shop browse or signed-in shells, tweaks mount
   styles/tokens.css      design tokens (oklch palette, type, radii, shadows)
   components/ui.jsx      Ico (icon set) · Ph (product-image placeholder)
   data/
@@ -53,8 +55,9 @@ Dockerfile               production image (static app + API, one process)
 ```
 
 ### Destinations
-- **Retailer:** `Shop`, plus order history and cart in the nav.
-- **Brand:** `Overview · Orders · Products · Insights · Retailers`.
+- **Public:** `/` shop floor · `/products/:id` · `/signin` · `/signup/buyer` · `/signup/seller`
+- **Retailer (signed in):** same shop at `/`, plus order history and cart checkout.
+- **Brand:** `Overview · Orders · Products · Insights · Retailers` under `/studio`.
 
 Product thumbnails come from `loremflickr.com` with a tonal fallback when offline;
 replace with `Product.imageUrl`. The operator **Console** lives under `src/console/`
@@ -79,9 +82,9 @@ POST   /api/session             { email, password }
 GET    /api/session
 DELETE /api/session
 GET    /api/health
-GET    /api/brands
-GET    /api/products?category=
-GET    /api/products/:id
+GET    /api/brands              public catalogue (sellers only see their brand when signed in)
+GET    /api/products?category=  public catalogue
+GET    /api/products/:id        public
 POST   /api/products           { name, cat, unit, wp, rrp, moq, stock, blurb }
 GET    /api/orders
 POST   /api/orders              { items: [{ id, qty }], note }

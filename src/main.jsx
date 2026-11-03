@@ -6,7 +6,7 @@ import './retailer/retailer.css';
 import { actions, useStore } from './data/store.js';
 import { currentSession, logout } from './data/api.js';
 import { AuthScreen } from './auth/AuthScreen.jsx';
-import { destinationFor, isAuth, isStudio } from './route.jsx';
+import { destinationFor, isAuth, isPublicBrowse, isStudio } from './route.jsx';
 import {
   useTweaks, TweaksPanel, TweakSection, TweakRadio, TweakColor, TweakButton,
 } from './dev/tweaks.jsx';
@@ -18,15 +18,15 @@ const BrandApp = React.lazy(() => import('./brand/BrandApp.jsx').then(m => ({ de
 
 const TWEAK_DEFAULTS = {
   accent: 'oklch(0.42 0.15 280)',
-  catalogLayout: 'index',   // image-forward feed — the default shopping view
+  catalogLayout: 'index',
   density: 'regular',
 };
 
 const ACCENTS = [
-  'oklch(0.42 0.15 280)', // indigo
-  'oklch(0.40 0.13 25)',  // oxblood
-  'oklch(0.42 0.10 155)', // forest
-  'oklch(0.32 0.025 270)', // ink
+  'oklch(0.42 0.15 280)',
+  'oklch(0.40 0.13 25)',
+  'oklch(0.42 0.10 155)',
+  'oklch(0.32 0.025 270)',
 ];
 const DENSITY = { compact: 0.72, regular: 1, comfy: 1.35 };
 
@@ -51,17 +51,33 @@ function ScrollToTop() {
   return null;
 }
 
-function AuthRoutes({ onSuccess }) {
+function GuestRoutes({ layout, onSuccess }) {
   const location = useLocation();
+  const { pathname, search } = location;
+
+  if (isAuth(pathname)) {
+    return (
+      <Routes>
+        <Route path="/signin" element={<AuthScreen view="signin" onSuccess={onSuccess} />} />
+        <Route path="/signup/buyer" element={<AuthScreen view="retailer" onSuccess={onSuccess} />} />
+        <Route path="/signup/seller" element={<AuthScreen view="brand" onSuccess={onSuccess} />} />
+        <Route path="*" element={<Navigate to={{ pathname: '/signin', search }} replace />} />
+      </Routes>
+    );
+  }
+
+  if (isStudio(pathname)) {
+    return <Navigate to={{ pathname: '/signin', search: withAs(search, 'seller') }} state={{ from: location }} replace />;
+  }
+
+  if (pathname === '/orders' || pathname.startsWith('/orders/')) {
+    return <Navigate to={{ pathname: '/signin', search: withAs(search, 'buyer') }} state={{ from: location }} replace />;
+  }
+
   return (
-    <Routes>
-      <Route path="/signin" element={<AuthScreen view="signin" onSuccess={onSuccess} />} />
-      <Route path="/signup/buyer" element={<AuthScreen view="retailer" onSuccess={onSuccess} />} />
-      <Route path="/signup/seller" element={<AuthScreen view="brand" onSuccess={onSuccess} />} />
-      <Route path="*" element={
-        <Navigate to={{ pathname: '/signin', search: location.search }} state={{ from: location }} replace />
-      } />
-    </Routes>
+    <Suspense fallback={<Boot />}>
+      <RetailerApp key={layout} layout={layout} guest />
+    </Suspense>
   );
 }
 
@@ -88,6 +104,13 @@ function SignedInRoutes({ role, layout, onSignOut }) {
   );
 }
 
+function withAs(search, as) {
+  const params = new URLSearchParams(String(search || '').replace(/^\?/, ''));
+  params.set('as', as);
+  const out = params.toString();
+  return out ? `?${out}` : '';
+}
+
 function Root() {
   const s = useStore();
   const location = useLocation();
@@ -105,7 +128,8 @@ function Root() {
         const session = await currentSession();
         if (cancel) return;
         if (!session) {
-          setGate('auth');
+          const ok = await actions.hydrateGuest();
+          if (!cancel) setGate(ok ? 'guest' : 'boot');
           return;
         }
         const ok = await actions.hydrate(session);
@@ -118,6 +142,7 @@ function Root() {
     })();
     return () => { cancel = true; };
   }, [attempt]);
+
   useEffect(() => {
     const r = document.documentElement;
     r.style.setProperty('--accent', t.accent);
@@ -131,8 +156,9 @@ function Root() {
 
   const signOut = async () => {
     await logout();
-    setGate('auth');
-    navigate({ pathname: '/signin', search: location.search }, { replace: true });
+    const ok = await actions.hydrateGuest();
+    setGate(ok ? 'guest' : 'boot');
+    navigate({ pathname: isPublicBrowse(location.pathname) ? location.pathname : '/', search: location.search }, { replace: true });
   };
 
   const signedIn = gate === 'app' && s.sessionRole;
@@ -140,8 +166,8 @@ function Root() {
   return (
     <React.Fragment>
       <ScrollToTop />
-      {gate === 'auth'
-        ? <AuthRoutes onSuccess={enter} />
+      {gate === 'guest'
+        ? <GuestRoutes layout={t.catalogLayout} onSuccess={enter} />
         : !signedIn
           ? <Boot error={s.error || bootError} onRetry={() => setAttempt(n => n + 1)} />
           : <SignedInRoutes role={s.sessionRole} layout={t.catalogLayout} onSignOut={signOut} />}
