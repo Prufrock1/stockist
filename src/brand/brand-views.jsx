@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link, useLocation } from 'react-router';
 import { BRANDS, PRODUCTS, CATEGORIES, money, useStore, actions, orderLines, orderSubtotal, orderUnits } from '../data/store.js';
 import { Ico, Ph } from '../components/ui.jsx';
 import { ProdImg } from '../components/ProductImage.jsx';
@@ -366,6 +367,7 @@ export function NewProductPage({ onDone }) {
 
 export function BrandProfilePage() {
   const brand = BRANDS[0] || null;
+  const { search } = useLocation();
   const [form, setForm] = React.useState(() => ({
     name: brand?.name || '',
     category: brand?.category || CATEGORIES[0],
@@ -444,6 +446,11 @@ export function BrandProfilePage() {
           <div style={{ color: 'var(--ok)', fontSize: 13, marginTop: 14 }}>Profile saved.</div>
         )}
         <div className="bd-form-actions">
+          {brand?.id ? (
+            <Link className="btn btn-ghost" to={{ pathname: `/brands/${brand.id}`, search }}>
+              View public page
+            </Link>
+          ) : null}
           <button type="submit" className="btn btn-pri" disabled={pending}>
             {pending ? 'Saving…' : 'Save profile'}
           </button>

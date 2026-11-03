@@ -49,15 +49,16 @@ server/                  Node API: Postgres, migrations, signed sessions
 Dockerfile               production image (static app + API, one process)
     types.d.ts           data contract (Brand, Product, Order, …)
   retailer/              shopping shell, PDP, cart drawer, confirm, order history
+  brands/                public brand directory + bio pages
   brand/                 dashboard shell, overview, orders, products, insights, charts
   console/               deferred past 1.0 — chat + buying spreadsheet (kept, not routed)
   dev/tweaks.jsx         dev-only design exploration panel (?dev)
 ```
 
 ### Destinations
-- **Public:** `/` shop floor · `/products/:id` · `/signin` · `/signup/buyer` · `/signup/seller`
+- **Public:** `/` shop floor · `/products/:id` · `/brands` directory · `/brands/:id` bio · `/signin` · `/signup/buyer` · `/signup/seller`
 - **Retailer (signed in):** same shop at `/`, plus order history and cart checkout.
-- **Brand:** `Overview · Orders · Products · Brand profile · Insights · Retailers` under `/studio`.
+- **Brand:** `Overview · Orders · Products · Brand profile · Insights · Retailers` under `/studio`. Brand profile links to the public `/brands/:id` page; sellers can open marketplace paths (`/`, `/products/:id`, `/brands*`) to preview how buyers see them.
 
 Product thumbnails come from `loremflickr.com` with a tonal fallback when offline;
 replace with `Product.imageUrl`. The operator **Console** lives under `src/console/`
