@@ -12,14 +12,6 @@ import { ProductDetail, CartDrawer, Confirm, RetailerOrders } from './retailer-f
 import { KeepSearch, useGo } from '../route.jsx';
 import './retailer.css';
 
-const ConsoleApp = React.lazy(() => import('../console/ConsoleApp.jsx').then(m => ({ default: m.ConsoleApp })));
-
-const Loading = ({ label }) => (
-  <div style={{ position: 'fixed', inset: 0, display: 'grid', placeItems: 'center',
-    background: 'var(--paper)', fontFamily: 'var(--font-mono)', fontSize: 12,
-    letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>{label}</div>
-);
-
 const SORTS = [
   { key: 'featured', label: 'Featured' },
   { key: 'price-asc', label: 'Price · low to high' },
@@ -85,8 +77,7 @@ function Catalog() {
         <div className="rt-hero-lead">
           <p>Buy directly from the makers you want on your shelves — small-batch food, considered apparel, hand-made homeware. One trade account, one order, net-30 terms.</p>
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <Link className="btn-fill" to={{ pathname: '/console', search }}><Ico name="store" size={15} /> Open the console</Link>
-            <button className="btn-line" onClick={() => document.querySelector('.rt-catalog').scrollIntoView({ behavior: 'smooth' })}>Browse the catalogue <Ico name="arrowR" size={14} /></button>
+            <button type="button" className="btn-fill" onClick={() => document.querySelector('.rt-catalog').scrollIntoView({ behavior: 'smooth' })}>Browse the catalogue <Ico name="arrowR" size={14} /></button>
           </div>
         </div>
       </div>
@@ -139,15 +130,6 @@ function ConfirmRoute() {
   return <Confirm orderId={id} goCatalog={() => go('/')} goOrders={() => go('/orders')} />;
 }
 
-function ConsoleRoute({ onSignOut }) {
-  const go = useGo();
-  return (
-    <React.Suspense fallback={<Loading label="Opening the console…" />}>
-      <ConsoleApp onExit={() => go('/')} onSignOut={onSignOut} />
-    </React.Suspense>
-  );
-}
-
 function ShopShell({ layout, onSignOut, cat, setCat, sortI, setSortI, cartOpen, setCartOpen, toast, flash }) {
   const s = useStore();
   const { pathname, search } = useLocation();
@@ -162,7 +144,6 @@ function ShopShell({ layout, onSignOut, cat, setCat, sortI, setSortI, cartOpen, 
         <div className="rt-navin">
           <div className="rt-navleft">
             <Link className={'rt-navlink ' + (shopOn ? 'active' : '')} to={{ pathname: '/', search }}>Shop</Link>
-            <Link className="rt-navlink" to={{ pathname: '/console', search }}>Console</Link>
           </div>
           <Link className="rt-logo" to={{ pathname: '/', search }}>STOCKIST</Link>
           <div className="rt-navright">
@@ -213,7 +194,9 @@ export function RetailerApp({ layout, onSignOut }) {
 
   return (
     <Routes>
-      <Route path="/console" element={<ConsoleRoute onSignOut={onSignOut} />} />
+      {/* Console is deferred past 1.0; keep src/console/ and send bookmarks home. */}
+      <Route path="/console" element={<KeepSearch to="/" />} />
+      <Route path="/console/*" element={<KeepSearch to="/" />} />
       <Route path="/" element={<ShopShell {...shell} />}>
         <Route index element={<Catalog />} />
         <Route path="products/:id" element={<ProductRoute />} />
